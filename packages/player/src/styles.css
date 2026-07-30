@@ -10,3 +10,8 @@ html {
 body {
   @apply bg-background text-foreground overflow-hidden!;
 }
+
+#root {
+  min-height: 100dvh;
+  isolation: isolate;
+}

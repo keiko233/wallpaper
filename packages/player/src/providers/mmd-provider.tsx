@@ -343,7 +343,7 @@ export function MmdProvider({
   stages = DEFAULT_STAGES,
   initialModelIndex = 0,
   initialMotionIndex = 0,
-  initialBackground = "#63B0F7FF",
+  initialBackground = "#FFFFFFFF",
   initialVolume = 0.3,
   initialPlaybackRate = 1,
   persistence,
@@ -1133,7 +1133,7 @@ export function MmdCanvas({
           <Motion.div
             animate={{ opacity: 1 }}
             aria-hidden
-            className="pointer-events-none absolute inset-0 z-20 bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.08),rgba(0,0,0,0.5))]"
+            className="pointer-events-none absolute inset-0 z-20"
             exit={{ opacity: 0 }}
             initial={{ opacity: 0 }}
             transition={{
@@ -1143,7 +1143,7 @@ export function MmdCanvas({
           >
             <Motion.div
               animate={{ opacity: [0.35, 0.75, 0.35], scale: [0.92, 1, 0.92] }}
-              className="absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80 shadow-[0_0_24px_rgba(255,255,255,0.55)]"
+              className="absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-foreground/90 shadow-lg shadow-primary/40"
               transition={{
                 duration: 1.1,
                 ease: "easeInOut",

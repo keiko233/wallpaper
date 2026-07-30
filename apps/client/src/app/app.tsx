@@ -114,25 +114,26 @@ export default function WallpaperClientApp({
   );
 
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-background">
+    <main className="relative min-h-dvh overflow-hidden bg-transparent">
       <Player
         emptyState={<EmptyLibrary />}
         models={materialized.models}
         motions={materialized.motions}
         persistence={persistence}
-        stages={materialized.stages}
-      />
-
-      <ResourceLibrary
-        client={client}
-        onLibraryChanged={() =>
-          setLibraryRevision((revision) => revision + 1)
+        settingsContent={
+          <ResourceLibrary
+            client={client}
+            onLibraryChanged={() =>
+              setLibraryRevision((revision) => revision + 1)
+            }
+          />
         }
+        stages={materialized.stages}
       />
 
       {materializeError === null ? null : (
         <Alert
-          className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-xl bg-background/90 backdrop-blur"
+          className="fixed inset-x-4 bottom-4 z-40 mx-auto max-w-xl bg-popover/90 shadow-xl backdrop-blur-2xl"
           variant="error"
         >
           <AlertCircle />
@@ -146,15 +147,14 @@ export default function WallpaperClientApp({
 
 function EmptyLibrary() {
   return (
-    <section className="grid min-h-dvh place-items-center bg-muted/30 p-6">
-      <Card className="w-full max-w-lg">
+    <section className="grid min-h-dvh place-items-center bg-transparent p-6">
+      <Card className="w-full max-w-lg shadow-2xl shadow-overlay">
         <CardHeader className="text-center">
           <Library className="mx-auto mb-2 size-8 text-muted-foreground" />
           <CardTitle>Your playlist is empty</CardTitle>
           <CardDescription>
-            Open Resources, then add at least one model, motion, and
-            stage. Audio and camera follow the selected motion. Everything
-            you add is cached only on this device.
+            Open player setup below, then add at least one model, motion,
+            and stage. Everything you add is cached only on this device.
           </CardDescription>
         </CardHeader>
       </Card>

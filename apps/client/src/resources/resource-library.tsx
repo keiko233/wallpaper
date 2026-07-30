@@ -135,7 +135,7 @@ function ResourceCover({ resource }: { resource: ResourceSummary }) {
   return (
     <div
       aria-label={`${resource.kind} placeholder cover`}
-      className="grid aspect-video w-full place-items-center rounded-lg border bg-gradient-to-br from-muted via-muted/70 to-primary/15 text-muted-foreground sm:w-36"
+      className="grid aspect-video w-full place-items-center rounded-lg border bg-muted/60 text-muted-foreground sm:w-36"
       role="img"
     >
       <Icon className="size-8" />
@@ -370,8 +370,8 @@ export function ResourceLibrary({
         <DialogTrigger
           render={
             <Button
-              className="fixed right-[calc(var(--desktop-safe-area-right,0px)+1rem)] top-[calc(var(--desktop-safe-area-top,0px)+1rem)] z-40 shadow-lg"
-              variant="secondary"
+              className="w-full justify-start bg-control/70 shadow-sm backdrop-blur-xl"
+              variant="outline"
             />
           }
         >
@@ -508,7 +508,7 @@ export function ResourceLibrary({
                       const source = sourceById.get(item.sourceId);
                       return (
                         <div
-                          className="rounded-xl border bg-background p-4"
+                          className="rounded-xl border bg-card/55 p-4 shadow-sm backdrop-blur-xl"
                           key={item.localResourceId}
                         >
                           <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
@@ -657,7 +657,7 @@ export function ResourceLibrary({
                   ) : null}
                   {sources.map((source) => (
                     <div
-                      className="space-y-3 rounded-xl border bg-background p-4"
+                      className="space-y-3 rounded-xl border bg-card/55 p-4 shadow-sm backdrop-blur-xl"
                       key={source.id}
                     >
                       <div className="flex items-start justify-between gap-4">

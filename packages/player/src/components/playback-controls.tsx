@@ -53,7 +53,7 @@ export function PlaybackControls() {
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--desktop-safe-area-bottom,0px)+0.75rem)] z-20 flex justify-center px-3">
-      <div className="pointer-events-auto flex min-w-0 items-center gap-1 rounded-2xl border border-white/15 bg-background/15 p-1.5 opacity-45 shadow-2xl shadow-black/15 backdrop-blur-xl transition-[opacity,background-color] duration-200 hover:bg-background/65 hover:opacity-100 focus-within:bg-background/65 focus-within:opacity-100">
+      <div className="pointer-events-auto flex min-w-0 items-center gap-1 rounded-2xl border border-border/80 bg-popover/65 p-1.5 opacity-55 shadow-2xl shadow-overlay backdrop-blur-2xl transition-[opacity,background-color] duration-200 hover:bg-popover/90 hover:opacity-100 focus-within:bg-popover/90 focus-within:opacity-100">
         <div className="hidden w-52 min-w-0 px-2 sm:block">
           <p className="truncate text-sm font-medium">{motion.name}</p>
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">

@@ -8,19 +8,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@wallpaper/ui/select";
-import { Separator } from "@wallpaper/ui/separator";
 import { Slider } from "@wallpaper/ui/slider";
 import { Switch } from "@wallpaper/ui/switch";
+import {
+  Tabs,
+  TabsList,
+  TabsPanel,
+  TabsTab,
+} from "@wallpaper/ui/tabs";
 import { cn } from "@wallpaper/ui/utils";
 import { useMmdActions, useMmdState } from "../providers/mmd-context";
 import { PlaylistEditor } from "./playlist-editor";
 import {
+  SheetDescription,
   SheetFooter,
   SheetHeader,
   SheetPanel,
   SheetPopup,
   SheetTitle,
 } from "@wallpaper/ui/sheet";
+import type { ReactNode } from "react";
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const MATERIAL_RENDER_MODE_LABELS = {
@@ -46,6 +53,35 @@ function SettingHeading({ title, value }: { title: string; value?: string }) {
         </span>
       )}
     </div>
+  );
+}
+
+function SettingsGroup({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4 shadow-sm backdrop-blur-xl">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          {description === undefined ? null : (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -97,7 +133,7 @@ function SettingSwitch({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border px-3 py-2.5">
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-control/35 px-3 py-2.5">
       <div className="min-w-0">
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs leading-relaxed text-muted-foreground">
@@ -176,7 +212,11 @@ function ResourceSelector({
   );
 }
 
-export function MmdSettings() {
+export function MmdSettings({
+  settingsContent,
+}: {
+  settingsContent?: ReactNode;
+}) {
   const {
     models,
     motions,
@@ -219,21 +259,21 @@ export function MmdSettings() {
   const colorValue = background.slice(0, 7);
 
   return (
-    <SheetPopup className="bg-background/5 backdrop-blur">
-      <SheetHeader>
-        <SheetTitle>MMD settings</SheetTitle>
-        {/* <SheetDescription>
-            {model.name} · {motion.name} · {status}
-          </SheetDescription> */}
+    <SheetPopup className="bg-popover/82 backdrop-blur-2xl">
+      <SheetHeader className="border-b border-border/60 bg-card/20">
+        <SheetTitle>Player settings</SheetTitle>
+        <SheetDescription className="truncate pe-8">
+          {model.name} · {motion.name}
+        </SheetDescription>
       </SheetHeader>
 
-      <SheetPanel className="space-y-6">
+      <SheetPanel className="space-y-4">
         <div
           className={cn(
-            "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+            "flex items-center gap-2 rounded-xl border border-border/70 bg-control/35 px-3 py-2 text-xs",
             status === "error"
-              ? "border-destructive/40 bg-destructive/5 text-destructive-foreground"
-              : "bg-muted/40 text-muted-foreground",
+              ? "border-destructive/40 bg-destructive/8 text-destructive-foreground"
+              : "text-muted-foreground",
           )}
         >
           <span
@@ -253,7 +293,24 @@ export function MmdSettings() {
           </span>
         </div>
 
-        <section className="space-y-4">
+        <Tabs defaultValue="content">
+          <TabsList className="grid w-full grid-cols-3 bg-muted/60 backdrop-blur-xl">
+            <TabsTab value="content">Content</TabsTab>
+            <TabsTab value="look">Look</TabsTab>
+            <TabsTab value="render">Render</TabsTab>
+          </TabsList>
+
+          <TabsPanel className="space-y-4 pt-2" value="content">
+            {settingsContent === undefined ? null : (
+              <SettingsGroup
+                description="Browse and manage resources cached on this device."
+                title="Library"
+              >
+                {settingsContent}
+              </SettingsGroup>
+            )}
+
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading
             title="Playlist"
             value={`${playlistIndex + 1} / ${playlist.length}`}
@@ -320,9 +377,7 @@ export function MmdSettings() {
           />
         </section>
 
-        <Separator />
-
-        <section className="space-y-4">
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div className="space-y-2">
             <Label>Playback speed</Label>
             <Select
@@ -345,9 +400,7 @@ export function MmdSettings() {
           </div>
         </section>
 
-        <Separator />
-
-        <section className="space-y-3">
+        <section className="space-y-3 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading title="Appearance" value={colorValue} />
           <Label className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
             Background color
@@ -364,10 +417,10 @@ export function MmdSettings() {
             />
           </Label>
         </section>
+          </TabsPanel>
 
-        <Separator />
-
-        <section className="space-y-4">
+          <TabsPanel className="space-y-4 pt-2" value="look">
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading title="Lighting" />
           <SettingSlider
             label="Ambient light"
@@ -444,9 +497,7 @@ export function MmdSettings() {
           />
         </section>
 
-        <Separator />
-
-        <section className="space-y-4">
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <SettingHeading title="MME effects" />
@@ -577,10 +628,10 @@ export function MmdSettings() {
             value={renderSettings.colorSaturation}
           />
         </section>
+          </TabsPanel>
 
-        <Separator />
-
-        <section className="space-y-4">
+          <TabsPanel className="space-y-4 pt-2" value="render">
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading title="Materials" />
 
           <div className="space-y-2">
@@ -651,6 +702,8 @@ export function MmdSettings() {
             }
           />
         </section>
+          </TabsPanel>
+        </Tabs>
       </SheetPanel>
 
       <SheetFooter>
