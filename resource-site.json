@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "repository": {
+    "name": "Wallpaper Resources",
+    "description": "Default resource repository for keiko233/wallpaper.",
+    "homepage": "https://github.com/keiko233/wallpaper"
+  },
+  "manifestRoot": "resource-manifests",
+  "outputDirectory": "dist/resource-publish",
+  "wallpaperEngine": {
+    "runtimeIdOverrides": {}
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/resource-schema" },
+    { "path": "./packages/resource-catalog" },
+    { "path": "./packages/ui" },
+    { "path": "./packages/player" },
+    { "path": "./apps/client/tsconfig.app.json" },
+    { "path": "./apps/client/tsconfig.node.json" }
+  ]
+}

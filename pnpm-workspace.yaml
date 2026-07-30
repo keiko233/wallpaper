@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+overrides:
+  '@esbuild-kit/core-utils>esbuild': ^0.25.12
