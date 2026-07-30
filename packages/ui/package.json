@@ -1,0 +1,24 @@
+{
+  "name": "@wallpaper/ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    "./styles.css": "./src/styles.css",
+    "./utils": "./src/lib/utils.ts",
+    "./use-media-query": "./src/hooks/use-media-query.ts",
+    "./*": "./src/components/*.tsx"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.25.0",
+    "react-day-picker": "^10.0.1",
+    "tailwind-merge": "^3.6.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

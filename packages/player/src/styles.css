@@ -1,0 +1,12 @@
+@import "@wallpaper/ui/styles.css";
+
+@source "./";
+@source "../../ui/src";
+
+html {
+  font-size: var(--ui-root-font-size, 16px);
+}
+
+body {
+  @apply bg-background text-foreground overflow-hidden!;
+}

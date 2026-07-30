@@ -1,0 +1,20 @@
+{
+  "name": "@wallpaper/resource-catalog",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "wallpaper-resource-catalog": "./bin/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts"
+  },
+  "dependencies": {
+    "@zip.js/zip.js": "^2.8.34",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/resource-catalog.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src", "tests"]
+}
