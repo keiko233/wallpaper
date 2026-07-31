@@ -10,9 +10,11 @@ import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 import { bundledAssets } from "./build/bundled-assets-vite-plugin.js";
+import { localResourceSource } from "./build/local-resource-source-vite-plugin.js";
 
 const workspaceRoot = fileURLToPath(new URL("../..", import.meta.url));
 const appRoot = fileURLToPath(new URL(".", import.meta.url));
+const siteConfigPath = resolve(workspaceRoot, "resource-site.json");
 const emptyBundle: WallpaperEngineBundle = {
   schemaVersion: 1,
   resources: {
@@ -81,6 +83,13 @@ export default defineConfig(({ mode }) => {
           : resolve(workspaceRoot, "resources"),
         resourcePaths: isWallpaperEngine ? ["/resources"] : [],
       }),
+      ...(isWallpaperEngine
+        ? []
+        : [
+            localResourceSource({
+              siteConfigPath,
+            }),
+          ]),
     ],
   };
 });

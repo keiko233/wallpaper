@@ -9,7 +9,9 @@ export const CLIENT_TARGET =
 export const DEFAULT_RESOURCE_SOURCE_URL =
   import.meta.env.VITE_DEFAULT_RESOURCE_SOURCE_URL?.trim() ||
   import.meta.env.VITE_RESOURCE_CATALOG_URL?.trim() ||
-  null;
+  (import.meta.env.DEV && typeof globalThis.location !== "undefined"
+    ? `${globalThis.location.origin}/resource-source/`
+    : null);
 
 const WEB_SYSTEM_RESOURCES: BundledPlayerResources = {
   models: [],

@@ -95,6 +95,10 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@wallpaper/resource-catalog':
+        specifier: workspace:*
+        version: link:../../packages/resource-catalog
 
   packages/player:
     dependencies:
