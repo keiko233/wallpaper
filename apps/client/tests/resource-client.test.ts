@@ -653,6 +653,51 @@ describe("ResourceClient install and source removal", () => {
       await database.libraryItems.get(summary.localResourceId),
     ).toBeDefined();
 
+    expect(await client.listInstalled()).toEqual([
+      expect.objectContaining({
+        localResourceId: summary.localResourceId,
+        localVersionId: summary.localVersionId,
+        name: "Keep",
+        sourceAvailable: false,
+        ready: true,
+      }),
+    ]);
+
+    await database.playlists.put({
+      id: "keep-playlist",
+      name: "Keep",
+      currentItemId: "keep-item",
+      createdAt: "2026-07-31T00:00:00.000Z",
+      updatedAt: "2026-07-31T00:00:00.000Z",
+    });
+    await database.playlistItems.put({
+      id: "keep-item",
+      playlistId: "keep-playlist",
+      position: 0,
+      modelId: `remote:${summary.localResourceId}`,
+      motionId: "motion:built-in",
+      stageId: "stage:built-in",
+      skyboxId: "skybox:built-in",
+    });
+
+    await client.uninstall(summary.localResourceId);
+    expect(await client.listInstalled()).toEqual([]);
+    expect(
+      await database.resources.get(summary.localResourceId),
+    ).toBeUndefined();
+    expect(
+      await database.resourceVersions.get(summary.localVersionId),
+    ).toBeUndefined();
+    expect(await cache.artifactBlobs.get(sha)).toBeUndefined();
+    expect(
+      await cache.artifactFiles.where("sha256").equals(sha).count(),
+    ).toBe(0);
+    expect(await database.artifactMetadata.get(sha)).toBeUndefined();
+    expect(await database.playlistItems.get("keep-item")).toBeUndefined();
+    expect(
+      (await database.playlists.get("keep-playlist"))?.currentItemId,
+    ).toBeNull();
+
     database.close();
     cache.close();
   });
@@ -710,6 +755,7 @@ describe("ResourceClient install and source removal", () => {
         modelId: `remote:${summary.localResourceId}`,
         motionId: "motion:built-in",
         stageId: "stage:built-in",
+        skyboxId: "skybox:built-in",
       },
       {
         id: "item-2",
@@ -718,6 +764,7 @@ describe("ResourceClient install and source removal", () => {
         modelId: "model:built-in",
         motionId: "motion:built-in",
         stageId: "stage:built-in",
+        skyboxId: "skybox:built-in",
       },
     ]);
 
@@ -736,6 +783,8 @@ describe("ResourceClient install and source removal", () => {
     expect(await database.playlistItems.get("item-2")).toBeDefined();
     const playlist = await database.playlists.get("playlist");
     expect(playlist?.currentItemId).toBe("item-2");
+    expect(await cache.artifactBlobs.get(sha)).toBeUndefined();
+    expect(await database.artifactMetadata.get(sha)).toBeUndefined();
 
     database.close();
     cache.close();
@@ -795,13 +844,14 @@ describe("ResourceClient install and source removal", () => {
 
     await client.removeSource(sourceB.id, "delete-installed");
     const after = await database.artifactMetadata.get(sha);
-    expect(after?.pinned).toBe(false);
+    expect(after).toBeUndefined();
+    expect(await cache.artifactBlobs.get(sha)).toBeUndefined();
 
     database.close();
     cache.close();
   });
 
-  it("keeps an old artifact pinned when upgrading one of two shared-SHA installs", async () => {
+  it("deletes an old artifact after the final shared install is removed", async () => {
     const options = createDatabaseOptions();
     const database = new WallpaperClientDatabase(
       "shared-sha-upgrade",
@@ -895,9 +945,8 @@ describe("ResourceClient install and source removal", () => {
       true,
     );
     await client.removeSource(sourceB.id, "delete-installed");
-    expect((await database.artifactMetadata.get(oldSha))?.pinned).toBe(
-      false,
-    );
+    expect(await database.artifactMetadata.get(oldSha)).toBeUndefined();
+    expect(await cache.artifactBlobs.get(oldSha)).toBeUndefined();
 
     database.close();
     cache.close();
@@ -965,7 +1014,7 @@ describe("ResourceClient install and source removal", () => {
     cache.close();
   });
 
-  it("recursively installs a motion and its bound dependencies", async () => {
+  it("removes only dependencies orphaned by an uninstall", async () => {
     const options = createDatabaseOptions();
     const database = new WallpaperClientDatabase(
       "recursive-install",
@@ -979,9 +1028,11 @@ describe("ResourceClient install and source removal", () => {
     const audioBlob = new Blob(["audio-payload"]);
     const cameraBlob = new Blob(["camera-payload"]);
     const motionBlob = new Blob(["motion-payload"]);
+    const sharedMotionBlob = new Blob(["shared-motion-payload"]);
     const audioSha = await sha256Hex(audioBlob);
     const cameraSha = await sha256Hex(cameraBlob);
     const motionSha = await sha256Hex(motionBlob);
+    const sharedMotionSha = await sha256Hex(sharedMotionBlob);
 
     const audioResource = makeResource(
       "rec-audio",
@@ -1013,11 +1064,21 @@ describe("ResourceClient install and source removal", () => {
         { id: "rec-camera", version: "1.0.0", binding: "camera" },
       ],
     );
+    const sharedMotionResource = makeResource(
+      "rec-motion-shared",
+      "1.0.0",
+      "motion",
+      "Rec Motion Shared",
+      sharedMotionSha,
+      sharedMotionBlob.size,
+      [{ id: "rec-audio", version: "1.0.0", binding: "audio" }],
+    );
 
     const blobs: Record<string, Blob> = {
       "objects/rec-audio.bin": audioBlob,
       "objects/rec-camera.bin": cameraBlob,
       "objects/rec-motion.bin": motionBlob,
+      "objects/rec-motion-shared.bin": sharedMotionBlob,
     };
 
     const fetcher = ((input: RequestInfo | URL) => {
@@ -1030,7 +1091,12 @@ describe("ResourceClient install and source removal", () => {
           JSON.stringify({
             schemaVersion: 1,
             revision: "a".repeat(64),
-            resources: [audioResource, cameraResource, motionResource],
+            resources: [
+              audioResource,
+              cameraResource,
+              motionResource,
+              sharedMotionResource,
+            ],
           }),
           { headers: { "content-type": "application/json" } },
         ),
@@ -1044,14 +1110,20 @@ describe("ResourceClient install and source removal", () => {
     const motionSummary = result.items.find(
       (item) => item.id === "rec-motion",
     );
+    const sharedMotionSummary = result.items.find(
+      (item) => item.id === "rec-motion-shared",
+    );
     expect(motionSummary).toBeDefined();
+    expect(sharedMotionSummary).toBeDefined();
 
     await client.install(motionSummary!, () => undefined);
+    await client.install(sharedMotionSummary!, () => undefined);
 
     expect(await client.isInstalled(motionSummary!)).toBe(true);
+    expect(await client.isInstalled(sharedMotionSummary!)).toBe(true);
 
     const installedVersions = await database.resourceVersions.toArray();
-    expect(installedVersions).toHaveLength(3);
+    expect(installedVersions).toHaveLength(4);
     const motionVersion = installedVersions.find(
       (version) => version.upstreamId === "rec-motion",
     );
@@ -1076,6 +1148,26 @@ describe("ResourceClient install and source removal", () => {
       )
       .toArray();
     expect(dependencyLibraryItems).toHaveLength(2);
+
+    await client.uninstall(motionSummary!.localResourceId);
+    expect(
+      (await database.resources.toArray())
+        .map((resource) => resource.upstreamId)
+        .sort(),
+    ).toEqual(["rec-audio", "rec-motion-shared"]);
+    expect(await cache.artifactBlobs.get(audioSha)).toBeDefined();
+    expect(await cache.artifactBlobs.get(cameraSha)).toBeUndefined();
+    expect(await cache.artifactBlobs.get(motionSha)).toBeUndefined();
+    expect(await client.isInstalled(sharedMotionSummary!)).toBe(true);
+
+    await client.uninstall(sharedMotionSummary!.localResourceId);
+    expect(await database.libraryItems.count()).toBe(0);
+    expect(await database.resources.count()).toBe(0);
+    expect(await database.resourceVersions.count()).toBe(0);
+    expect(await database.resourceDependencies.count()).toBe(0);
+    expect(await database.artifactMetadata.count()).toBe(0);
+    expect(await cache.artifactBlobs.count()).toBe(0);
+    expect(await cache.artifactFiles.count()).toBe(0);
 
     database.close();
     cache.close();

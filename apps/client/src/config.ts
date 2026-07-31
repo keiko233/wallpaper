@@ -1,4 +1,7 @@
-import { DEFAULT_STAGES } from "@wallpaper/player/defaults";
+import {
+  DEFAULT_SKYBOXES,
+  DEFAULT_STAGES,
+} from "@wallpaper/player/defaults";
 import type { BundledPlayerResources } from "./app/types";
 
 export const CLIENT_TARGET =
@@ -16,6 +19,7 @@ export const DEFAULT_RESOURCE_SOURCE_URL =
 const WEB_SYSTEM_RESOURCES: BundledPlayerResources = {
   models: [],
   motions: [],
+  skyboxes: DEFAULT_SKYBOXES,
   stages: DEFAULT_STAGES,
 };
 
@@ -23,6 +27,10 @@ export const WALLPAPER_ENGINE_BUNDLED_RESOURCES: BundledPlayerResources =
   CLIENT_TARGET === "wallpaper-engine"
     ? {
         ...__WALLPAPER_ENGINE_BUNDLED_RESOURCES__,
+        skyboxes: [
+          ...DEFAULT_SKYBOXES,
+          ...__WALLPAPER_ENGINE_BUNDLED_RESOURCES__.skyboxes,
+        ],
         stages: [
           ...DEFAULT_STAGES,
           ...__WALLPAPER_ENGINE_BUNDLED_RESOURCES__.stages,

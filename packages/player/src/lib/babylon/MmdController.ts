@@ -7,6 +7,7 @@ import type { MmdRenderSettings } from "../../types";
 export interface MmdLoadOptions {
   modelPath: string;
   stagePath: string | null;
+  skyboxPath: string | null;
   motionPath: string[];
   audioPath: string;
   cameraPath?: string;

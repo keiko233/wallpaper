@@ -22,6 +22,7 @@ const RESOURCES: PlayerResourceIds = {
   models: ["model-a", "model-b"],
   motions: ["motion-a", "motion-b"],
   stages: ["stage-a", "stage-b"],
+  skyboxes: ["skybox-none", "skybox-a"],
 };
 
 function createDatabaseOptions() {
@@ -261,12 +262,14 @@ describe("WallpaperClientDatabase", () => {
         modelId: "model-b",
         motionId: "motion-a",
         stageId: "stage-b",
+        skyboxId: "skybox-none",
       },
       {
         id: "same-id-1",
         modelId: "model-a",
         motionId: "motion-b",
         stageId: "stage-a",
+        skyboxId: "skybox-none",
       },
     ]);
     expect(items.every((item) => !("audioId" in item))).toBe(true);
@@ -299,6 +302,7 @@ describe("WallpaperClientDatabase", () => {
           modelId: "model-a",
           motionId: "motion-b",
           stageId: "stage-a",
+          skyboxId: "skybox-a",
         },
       ],
       playlistIndex: 0,
@@ -315,6 +319,7 @@ describe("WallpaperClientDatabase", () => {
           modelId: "model-a",
           motionId: "motion-b",
           stageId: "stage-a",
+          skyboxId: "skybox-a",
         },
       ],
       playlistIndex: 0,

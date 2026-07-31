@@ -1,4 +1,5 @@
 import type {
+  ArtifactEntrypoints,
   ResourceCatalog,
   ResourceKind,
 } from "@wallpaper/resource-schema";
@@ -49,7 +50,7 @@ export interface CachedResourceVersionRecord {
   contentType: string;
   sha256: string;
   byteSize: number;
-  entrypoints: Record<string, string | string[]>;
+  entrypoints: ArtifactEntrypoints;
   publishedAt: IsoDateTime;
 }
 
@@ -83,6 +84,7 @@ export interface PlaylistItemRecord {
   modelId: string;
   motionId: string;
   stageId: string;
+  skyboxId: string;
 }
 
 export interface ArtifactMetadataRecord {
@@ -120,7 +122,7 @@ export interface ResourceSourceRecord {
   enabled: boolean;
   isDefault: boolean;
   status: ResourceSourceStatus;
-  schemaVersion: 1 | 2 | null;
+  schemaVersion: 1 | 2 | 3 | null;
   revision: string | null;
   lastError: string | null;
   lastErrorAt: IsoDateTime | null;

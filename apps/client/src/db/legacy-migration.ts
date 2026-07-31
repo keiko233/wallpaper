@@ -25,12 +25,14 @@ export interface PlayerResourceIds {
   models: readonly string[];
   motions: readonly string[];
   stages: readonly string[];
+  skyboxes: readonly string[];
 }
 
 interface LegacyPlaylistItem extends Partial<MmdPlaylistItem> {
   modelIndex?: number;
   motionIndex?: number;
   stageIndex?: number;
+  skyboxIndex?: number;
 }
 
 function readLegacyValue(
@@ -57,11 +59,18 @@ function normalizeLegacyPlaylist(
   value: unknown,
   resources: PlayerResourceIds,
 ): MmdPlaylistItem[] {
-  if (!Array.isArray(value) || resources.stages.length === 0) return [];
+  if (
+    !Array.isArray(value) ||
+    resources.stages.length === 0 ||
+    resources.skyboxes.length === 0
+  ) {
+    return [];
+  }
 
     const modelIds = new Set(resources.models);
     const motionIds = new Set(resources.motions);
     const stageIds = new Set(resources.stages);
+    const skyboxIds = new Set(resources.skyboxes);
     const itemIds = new Set<string>();
 
     return value.flatMap((valueItem, index): MmdPlaylistItem[] => {
@@ -85,11 +94,18 @@ function normalizeLegacyPlaylist(
           : Number.isInteger(item.stageIndex)
             ? resources.stages[item.stageIndex!]
             : resources.stages[0];
+      const skyboxId =
+        typeof item.skyboxId === "string" && skyboxIds.has(item.skyboxId)
+          ? item.skyboxId
+          : Number.isInteger(item.skyboxIndex)
+            ? resources.skyboxes[item.skyboxIndex!]
+            : resources.skyboxes[0];
 
       if (
         modelId === undefined ||
         motionId === undefined ||
-        stageId === undefined
+        stageId === undefined ||
+        skyboxId === undefined
       ) {
         return [];
       }
@@ -103,7 +119,7 @@ function normalizeLegacyPlaylist(
       while (itemIds.has(id)) id = `${baseId}-${suffix++}`;
       itemIds.add(id);
 
-      return [{ id, modelId, motionId, stageId }];
+      return [{ id, modelId, motionId, stageId, skyboxId }];
     });
   }
 

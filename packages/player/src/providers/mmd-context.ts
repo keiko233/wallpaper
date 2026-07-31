@@ -4,6 +4,7 @@ import type {
   MmdRenderSettings,
   ModelList,
   MotionList,
+  SkyboxList,
   StageList,
 } from "../types";
 
@@ -13,12 +14,15 @@ export interface MmdState {
   models: readonly ModelList[];
   motions: readonly MotionList[];
   stages: readonly StageList[];
+  skyboxes: readonly SkyboxList[];
   modelIndex: number;
   motionIndex: number;
   stageIndex: number;
+  skyboxIndex: number;
   model: ModelList;
   motion: MotionList;
   stage: StageList;
+  skybox: SkyboxList;
   playlist: readonly MmdPlaylistItem[];
   playlistIndex: number;
   isPreloading: boolean;
@@ -35,12 +39,15 @@ export interface MmdActions {
   selectModel: (index: number) => void;
   selectMotion: (index: number) => void;
   selectStage: (index: number) => void;
+  selectSkybox: (index: number) => void;
   previousModel: () => void;
   nextModel: () => void;
   previousMotion: () => void;
   nextMotion: () => void;
   previousStage: () => void;
   nextStage: () => void;
+  previousSkybox: () => void;
+  nextSkybox: () => void;
   selectPlaylistItem: (index: number) => void;
   previousPlaylistItem: () => void;
   nextPlaylistItem: () => void;

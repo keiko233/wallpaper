@@ -2,12 +2,14 @@ import { z } from "zod";
 
 export const RESOURCE_CATALOG_SCHEMA_VERSION = 1 as const;
 export const RESOURCE_CATALOG_SCHEMA_VERSION_V2 = 2 as const;
+export const RESOURCE_CATALOG_SCHEMA_VERSION_V3 = 3 as const;
 export const RESOURCE_PACKAGE_FILES_DIRECTORY = "files" as const;
 
 export const RESOURCE_KINDS = [
   "model",
   "motion",
   "stage",
+  "skybox",
   "audio",
   "camera",
   "video",
@@ -73,11 +75,65 @@ export const ResourceDependencySchema = z
   })
   .strict();
 
+export const LegacyEntrypointsSchema = z.record(
+  z.string().trim().min(1).max(64),
+  z.union([
+    RelativePathSchema,
+    z.array(RelativePathSchema).min(1).max(100),
+  ]),
+);
+
+export const ArtifactEntrypointVariantSchema = z
+  .object({
+    id: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+    name: z.string().trim().min(1).max(160),
+    path: z.union([
+      RelativePathSchema,
+      z.array(RelativePathSchema).min(1).max(100),
+    ]),
+    default: z.boolean().optional(),
+    remark: z.string().trim().max(4_000).optional(),
+  })
+  .strict();
+
+const ArtifactEntrypointVariantsSchema = z
+  .array(ArtifactEntrypointVariantSchema)
+  .min(2)
+  .max(100)
+  .superRefine((variants, context) => {
+    const ids = new Set<string>();
+    let defaultCount = 0;
+    for (const [index, variant] of variants.entries()) {
+      if (ids.has(variant.id)) {
+        context.addIssue({
+          code: "custom",
+          message: `Duplicate entrypoint variant ID: ${variant.id}`,
+          path: [index, "id"],
+        });
+      }
+      ids.add(variant.id);
+      if (variant.default === true) defaultCount += 1;
+    }
+    if (defaultCount !== 1) {
+      context.addIssue({
+        code: "custom",
+        message: "Entrypoint variants must contain exactly one default.",
+        path: [],
+      });
+    }
+  });
+
 export const EntrypointsSchema = z.record(
   z.string().trim().min(1).max(64),
   z.union([
     RelativePathSchema,
     z.array(RelativePathSchema).min(1).max(100),
+    ArtifactEntrypointVariantsSchema,
   ]),
 );
 
@@ -163,6 +219,48 @@ const metadataShape = {
   dependencies: z.array(ResourceDependencySchema).max(50).default([]),
 } as const;
 
+function validateEntrypointVariantKinds(
+  value: {
+    kind: z.infer<typeof ResourceKindSchema>;
+    artifact: { entrypoints: z.infer<typeof EntrypointsSchema> };
+  },
+  context: z.RefinementCtx,
+): void {
+  for (const [key, entrypoint] of Object.entries(
+    value.artifact.entrypoints,
+  )) {
+    const first = Array.isArray(entrypoint) ? entrypoint[0] : undefined;
+    if (
+      typeof first === "object" &&
+      value.kind !== "model" &&
+      value.kind !== "stage" &&
+      value.kind !== "skybox"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Selectable entrypoint variants are currently supported only for model, stage, and skybox resources.",
+        path: ["artifact", "entrypoints", key],
+      });
+      continue;
+    }
+    if (typeof first === "object") {
+      for (const [index, variant] of (
+        entrypoint as ArtifactEntrypointVariant[]
+      ).entries()) {
+        if (Array.isArray(variant.path)) {
+          context.addIssue({
+            code: "custom",
+            message:
+              "Selectable model, stage, and skybox entrypoints must contain exactly one path.",
+            path: ["artifact", "entrypoints", key, index, "path"],
+          });
+        }
+      }
+    }
+  }
+}
+
 export const ResourceDefinitionSchema = z
   .object({
     ...metadataShape,
@@ -184,7 +282,8 @@ export const ResourceDefinitionSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine(validateEntrypointVariantKinds);
 
 export const ResourceDefinitionsSchema = z
   .object({
@@ -216,15 +315,19 @@ const publishedFileSchema = z
   })
   .strict();
 
+const catalogResourceShape = {
+  ...metadataShape,
+  cover: publishedFileSchema
+    .extend({
+      alt: z.string().trim().max(300).nullable(),
+    })
+    .strict()
+    .nullable(),
+} as const;
+
 export const CatalogResourceSchema = z
   .object({
-    ...metadataShape,
-    cover: publishedFileSchema
-      .extend({
-        alt: z.string().trim().max(300).nullable(),
-      })
-      .strict()
-      .nullable(),
+    ...catalogResourceShape,
     artifact: publishedFileSchema
       .extend({
         fileName: z.string().trim().min(1).max(255),
@@ -233,7 +336,35 @@ export const CatalogResourceSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine(validateEntrypointVariantKinds);
+
+function validateLegacyCatalogEntrypoints(
+  value: { resources: readonly z.infer<typeof CatalogResourceSchema>[] },
+  context: z.RefinementCtx,
+): void {
+  for (const [resourceIndex, resource] of value.resources.entries()) {
+    for (const [key, entrypoint] of Object.entries(
+      resource.artifact.entrypoints,
+    )) {
+      const first = Array.isArray(entrypoint) ? entrypoint[0] : undefined;
+      if (typeof first === "object") {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Selectable entrypoint variants require resource catalog schemaVersion 3.",
+          path: [
+            "resources",
+            resourceIndex,
+            "artifact",
+            "entrypoints",
+            key,
+          ],
+        });
+      }
+    }
+  }
+}
 
 export const ResourceCatalogV1Schema = z
   .object({
@@ -242,6 +373,7 @@ export const ResourceCatalogV1Schema = z
     resources: z.array(CatalogResourceSchema),
   })
   .strict()
+  .superRefine(validateLegacyCatalogEntrypoints)
   .superRefine(validateCatalogDependencyGraph);
 
 export const ResourceCatalogV2Schema = z
@@ -252,11 +384,23 @@ export const ResourceCatalogV2Schema = z
     resources: z.array(CatalogResourceSchema),
   })
   .strict()
+  .superRefine(validateLegacyCatalogEntrypoints)
+  .superRefine(validateCatalogDependencyGraph);
+
+export const ResourceCatalogV3Schema = z
+  .object({
+    schemaVersion: z.literal(RESOURCE_CATALOG_SCHEMA_VERSION_V3),
+    repository: ResourceCatalogRepositoryMetadataSchema,
+    revision: z.string().regex(/^[a-f0-9]{64}$/u),
+    resources: z.array(CatalogResourceSchema),
+  })
+  .strict()
   .superRefine(validateCatalogDependencyGraph);
 
 export const ResourceCatalogSchema = z.union([
   ResourceCatalogV1Schema,
   ResourceCatalogV2Schema,
+  ResourceCatalogV3Schema,
 ]);
 
 export const ResourceManifestSchema = ResourceDefinitionSchema;
@@ -369,6 +513,14 @@ export const WallpaperEngineBundleSchema = z
             })
             .strict(),
         ),
+        skyboxes: z.array(
+          z
+            .object({
+              ...bundledResourceBaseShape,
+              skyboxPath: bundledPublicPathSchema,
+            })
+            .strict(),
+        ),
       })
       .strict(),
   })
@@ -456,6 +608,53 @@ export function resourceIdentity(
   version: string,
 ): ResourceIdentity {
   return `${id}@${version}`;
+}
+
+export interface ResolvedArtifactEntrypoint {
+  id: string | null;
+  name: string | null;
+  paths: string[];
+  isDefault: boolean;
+  remark?: string;
+}
+
+export function resolveArtifactEntrypoints(
+  entrypoints: z.infer<typeof EntrypointsSchema>,
+  keys: readonly string[],
+): ResolvedArtifactEntrypoint[] {
+  for (const key of keys) {
+    const value = entrypoints[key];
+    if (typeof value === "string") {
+      return [
+        {
+          id: null,
+          name: null,
+          paths: [value],
+          isDefault: true,
+        },
+      ];
+    }
+    if (!Array.isArray(value) || value.length === 0) continue;
+    if (typeof value[0] === "string") {
+      return [
+        {
+          id: null,
+          name: null,
+          paths: value as string[],
+          isDefault: true,
+        },
+      ];
+    }
+    return (value as ArtifactEntrypointVariant[]).map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      paths:
+        typeof variant.path === "string" ? [variant.path] : variant.path,
+      isDefault: variant.default === true,
+      ...(variant.remark === undefined ? {} : { remark: variant.remark }),
+    }));
+  }
+  return [];
 }
 
 export interface DependencyGraphNode {
@@ -620,10 +819,15 @@ function validateCatalogDependencyGraph(
 }
 
 export type ArtifactFormat = z.infer<typeof ArtifactFormatSchema>;
+export type ArtifactEntrypoints = z.infer<typeof EntrypointsSchema>;
+export type ArtifactEntrypointVariant = z.infer<
+  typeof ArtifactEntrypointVariantSchema
+>;
 export type CatalogResource = z.infer<typeof CatalogResourceSchema>;
 export type ResourceCatalog = z.infer<typeof ResourceCatalogSchema>;
 export type ResourceCatalogV1 = z.infer<typeof ResourceCatalogV1Schema>;
 export type ResourceCatalogV2 = z.infer<typeof ResourceCatalogV2Schema>;
+export type ResourceCatalogV3 = z.infer<typeof ResourceCatalogV3Schema>;
 export type ResourceDefinition = z.infer<typeof ResourceDefinitionSchema>;
 export type ResourceDefinitions = z.infer<typeof ResourceDefinitionsSchema>;
 export type ResourceKind = z.infer<typeof ResourceKindSchema>;

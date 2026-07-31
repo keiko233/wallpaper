@@ -28,6 +28,7 @@ export function PlaybackControls() {
     model,
     motion,
     stage,
+    skybox,
     playlist,
     playlistIndex,
     status,
@@ -75,7 +76,7 @@ export function PlaybackControls() {
             </span>
           </div>
           <span className="sr-only">
-            Model: {model.name}. Stage: {stage.name}.
+            Model: {model.name}. Stage: {stage.name}. Skybox: {skybox.name}.
           </span>
         </div>
 
