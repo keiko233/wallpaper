@@ -15,12 +15,14 @@ import { MmdCanvas, MmdProvider } from "./providers/mmd-provider";
 import {
   DEFAULT_MODELS,
   DEFAULT_MOTIONS,
+  DEFAULT_SKYBOXES,
   DEFAULT_STAGES,
 } from "./defaults";
 import type {
   ModelList,
   MotionList,
   PlayerPersistence,
+  SkyboxList,
   StageList,
 } from "./types";
 import type { ReactNode } from "react";
@@ -31,6 +33,7 @@ export interface PlayerAppProps {
   motions?: readonly MotionList[];
   persistence?: PlayerPersistence;
   settingsContent?: ReactNode;
+  skyboxes?: readonly SkyboxList[];
   stages?: readonly StageList[];
 }
 
@@ -40,18 +43,20 @@ export default function App({
   motions = DEFAULT_MOTIONS,
   persistence,
   settingsContent,
+  skyboxes = DEFAULT_SKYBOXES,
   stages = DEFAULT_STAGES,
 }: PlayerAppProps) {
   if (
     models.length === 0 ||
     motions.length === 0 ||
-    stages.length === 0
+    stages.length === 0 ||
+    skyboxes.length === 0
   ) {
     return (
       <Sheet>
         {emptyState ?? (
           <section className="grid h-dvh w-full place-items-center bg-transparent p-6 text-center text-muted-foreground">
-            Add a model, motion, and stage to begin.
+            Add a model, motion, stage, and skybox option to begin.
           </section>
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--desktop-safe-area-bottom,0px)+0.75rem)] z-20 flex justify-center px-3">
@@ -92,6 +97,7 @@ export default function App({
       models={models}
       motions={motions}
       persistence={persistence}
+      skyboxes={skyboxes}
       stages={stages}
     >
       <section className="w-full h-dvh relative">

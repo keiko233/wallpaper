@@ -221,12 +221,15 @@ export function MmdSettings({
     models,
     motions,
     stages,
+    skyboxes,
     modelIndex,
     motionIndex,
     stageIndex,
+    skyboxIndex,
     model,
     motion,
     stage,
+    skybox,
     background,
     status,
     error,
@@ -241,12 +244,15 @@ export function MmdSettings({
     selectModel,
     selectMotion,
     selectStage,
+    selectSkybox,
     previousModel,
     nextModel,
     previousMotion,
     nextMotion,
     previousStage,
     nextStage,
+    previousSkybox,
+    nextSkybox,
     setBackground,
     setVolume,
     setPlaybackRate,
@@ -324,6 +330,9 @@ export function MmdSettings({
               <p className="truncate text-xs text-muted-foreground">
                 {stage.name}
               </p>
+              <p className="truncate text-xs text-muted-foreground">
+                {skybox.name}
+              </p>
             </div>
             <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex gap-2">
@@ -374,6 +383,14 @@ export function MmdSettings({
             onNext={nextStage}
             onPrevious={previousStage}
             value={stageIndex}
+          />
+          <ResourceSelector
+            items={skyboxes}
+            label="Skybox"
+            onChange={selectSkybox}
+            onNext={nextSkybox}
+            onPrevious={previousSkybox}
+            value={skyboxIndex}
           />
         </section>
 

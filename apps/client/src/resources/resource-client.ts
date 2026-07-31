@@ -10,7 +10,11 @@ import {
   WallpaperClientDatabase,
   pruneArtifactCache,
 } from "../db";
-import type { ArtifactFileRecord, ResourceSourceRecord } from "../db";
+import type {
+  ArtifactFileRecord,
+  CachedResourceRecord,
+  ResourceSourceRecord,
+} from "../db";
 import { ResourceSourceService } from "./resource-sources";
 import {
   BlobReader,
@@ -61,6 +65,23 @@ export interface CatalogSearchOutput {
   nextCursor: string | null;
   catalogRevision: string;
   sources: CatalogSearchSourceInfo[];
+}
+
+export interface InstalledResourceSummary {
+  localResourceId: string;
+  localVersionId: string;
+  name: string;
+  kind: ResourceKind;
+  version: string;
+  description: string | null;
+  categories: string[];
+  tags: string[];
+  sourceId: string;
+  sourceName: string;
+  sourceAvailable: boolean;
+  coverUrl: string | null;
+  addedAt: string;
+  ready: boolean;
 }
 
 export function makeLocalResourceId(
@@ -796,6 +817,65 @@ export class ResourceClient {
     return this.isVersionInstalled(summary.localVersionId);
   }
 
+  async listInstalled(): Promise<InstalledResourceSummary[]> {
+    const libraryItems = await this.database.libraryItems
+      .where("source")
+      .equals("remote")
+      .toArray();
+    const installed = await Promise.all(
+      libraryItems.map(async (item) => {
+        if (item.resourceVersionId === null) return null;
+        const [resource, version, source] = await Promise.all([
+          this.database.resources.get(item.resourceId),
+          this.database.resourceVersions.get(item.resourceVersionId),
+          item.sourceId === null
+            ? Promise.resolve(undefined)
+            : this.database.resourceSources.get(item.sourceId),
+        ]);
+        if (
+          resource === undefined ||
+          version === undefined ||
+          resource.visibility === "dependency-only"
+        ) {
+          return null;
+        }
+        return {
+          localResourceId: resource.id,
+          localVersionId: version.id,
+          name: resource.name,
+          kind: resource.kind,
+          version: version.upstreamVersion,
+          description: resource.description,
+          categories: [...resource.categories],
+          tags: [...resource.tags],
+          sourceId: resource.sourceId,
+          sourceName: resource.sourceName,
+          sourceAvailable: source !== undefined,
+          coverUrl: resource.coverUrl,
+          addedAt: item.addedAt,
+          ready: await this.isVersionInstalled(version.id),
+        } satisfies InstalledResourceSummary;
+      }),
+    );
+    return installed
+      .filter(
+        (item): item is InstalledResourceSummary => item !== null,
+      )
+      .sort(
+        (left, right) =>
+          right.addedAt.localeCompare(left.addedAt) ||
+          left.name.localeCompare(right.name),
+      );
+  }
+
+  async uninstall(resourceId: string): Promise<void> {
+    const resource = await this.database.resources.get(resourceId);
+    if (resource === undefined) {
+      throw new Error(`Installed resource not found: ${resourceId}`);
+    }
+    await this.deleteInstalledResources([resource]);
+  }
+
   async removeSource(
     sourceId: string,
     mode: "keep-installed" | "delete-installed",
@@ -809,11 +889,74 @@ export class ResourceClient {
       .where("sourceId")
       .equals(sourceId)
       .toArray();
-    const resourceIds = resources.map((resource) => resource.id);
-    const versions = await this.database.resourceVersions
-      .where("sourceId")
-      .equals(sourceId)
-      .toArray();
+    await this.deleteInstalledResources(resources);
+    await this.sourceService.remove(sourceId);
+  }
+
+  private async deleteInstalledResources(
+    resources: readonly CachedResourceRecord[],
+  ): Promise<void> {
+    const requestedResourceIds = new Set(
+      resources.map((resource) => resource.id),
+    );
+    if (requestedResourceIds.size === 0) return;
+
+    const [allResources, allVersions, allLibraryItems, allDependencies] =
+      await Promise.all([
+        this.database.resources.toArray(),
+        this.database.resourceVersions.toArray(),
+        this.database.libraryItems.toArray(),
+        this.database.resourceDependencies.toArray(),
+      ]);
+    const resourceById = new Map(
+      allResources.map((resource) => [resource.id, resource]),
+    );
+    const dependenciesByParent = new Map<string, string[]>();
+    for (const dependency of allDependencies) {
+      const current =
+        dependenciesByParent.get(dependency.parentVersionId) ?? [];
+      current.push(dependency.dependencyVersionId);
+      dependenciesByParent.set(dependency.parentVersionId, current);
+    }
+
+    const reachableVersionIds = new Set<string>();
+    const pendingVersionIds = allLibraryItems.flatMap((item) => {
+      const resource = resourceById.get(item.resourceId);
+      return item.resourceVersionId !== null &&
+        !requestedResourceIds.has(item.resourceId) &&
+        resource?.visibility !== "dependency-only"
+        ? [item.resourceVersionId]
+        : [];
+    });
+    while (pendingVersionIds.length > 0) {
+      const versionId = pendingVersionIds.pop();
+      if (
+        versionId === undefined ||
+        reachableVersionIds.has(versionId)
+      ) {
+        continue;
+      }
+      reachableVersionIds.add(versionId);
+      pendingVersionIds.push(
+        ...(dependenciesByParent.get(versionId) ?? []),
+      );
+    }
+
+    for (const item of allLibraryItems) {
+      const resource = resourceById.get(item.resourceId);
+      if (
+        resource?.visibility === "dependency-only" &&
+        (item.resourceVersionId === null ||
+          !reachableVersionIds.has(item.resourceVersionId))
+      ) {
+        requestedResourceIds.add(item.resourceId);
+      }
+    }
+
+    const resourceIds = [...requestedResourceIds];
+    const versions = allVersions.filter((version) =>
+      requestedResourceIds.has(version.resourceId),
+    );
     const versionIds = new Set(
       versions.map((version) => version.id),
     );
@@ -821,13 +964,16 @@ export class ResourceClient {
       ...new Set(versions.map((version) => version.sha256)),
     ];
 
-    const libraryItems = await this.database.libraryItems
-      .where("resourceId")
-      .anyOf(resourceIds)
-      .toArray();
-    const runtimeIds = new Set(
-      libraryItems.map((item) => `remote:${item.resourceId}`),
+    const libraryItems = allLibraryItems.filter((item) =>
+      requestedResourceIds.has(item.resourceId),
     );
+    const runtimeIds = libraryItems.map(
+      (item) => `remote:${item.resourceId}`,
+    );
+    const usesRemovedRuntime = (id: string | undefined): boolean =>
+      id !== undefined && runtimeIds.some(
+        (runtimeId) => id === runtimeId || id.startsWith(`${runtimeId}:`),
+      );
 
     await this.database.transaction(
       "rw",
@@ -844,9 +990,10 @@ export class ResourceClient {
           await this.database.playlistItems.toArray();
         const itemsToRemove = allPlaylistItems.filter(
           (item) =>
-            runtimeIds.has(item.modelId) ||
-            runtimeIds.has(item.motionId) ||
-            runtimeIds.has(item.stageId),
+            usesRemovedRuntime(item.modelId) ||
+            usesRemovedRuntime(item.motionId) ||
+            usesRemovedRuntime(item.stageId) ||
+            usesRemovedRuntime(item.skyboxId),
         );
         const removedItemIds = new Set(
           itemsToRemove.map((item) => item.id),
@@ -883,17 +1030,14 @@ export class ResourceClient {
           }
         }
 
-        await this.database.resources
-          .where("sourceId")
-          .equals(sourceId)
-          .delete();
+        await this.database.resources.bulkDelete(resourceIds);
         await this.database.resourceVersions
-          .where("sourceId")
-          .equals(sourceId)
+          .where("resourceId")
+          .anyOf(resourceIds)
           .delete();
         await this.database.libraryItems
-          .where("sourceId")
-          .equals(sourceId)
+          .where("resourceId")
+          .anyOf(resourceIds)
           .delete();
         await this.database.resourceDependencies
           .where("parentVersionId")
@@ -906,15 +1050,30 @@ export class ResourceClient {
       },
     );
 
-    await Promise.all(
-      sha256s.map((sha256) => this.syncArtifactPin(sha256)),
+    const artifactPins = await Promise.all(
+      sha256s.map(async (sha256) => ({
+        sha256,
+        pinned: await this.syncArtifactPin(sha256),
+      })),
     );
-
-    await this.sourceService.remove(sourceId);
+    await Promise.all(
+      artifactPins
+        .filter((artifact) => !artifact.pinned)
+        .map((artifact) =>
+          Promise.all([
+            this.cache.artifactBlobs.delete(artifact.sha256),
+            this.cache.artifactFiles
+              .where("sha256")
+              .equals(artifact.sha256)
+              .delete(),
+            this.database.artifactMetadata.delete(artifact.sha256),
+          ]),
+        ),
+    );
     await pruneArtifactCache(this.database, this.cache);
   }
 
-  private async syncArtifactPin(sha256: string): Promise<void> {
+  private async syncArtifactPin(sha256: string): Promise<boolean> {
     const versions = await this.database.resourceVersions
       .where("sha256")
       .equals(sha256)
@@ -934,5 +1093,6 @@ export class ResourceClient {
         ? {}
         : { resourceVersionId: installedReference.resourceVersionId }),
     });
+    return installedReference !== undefined;
   }
 }

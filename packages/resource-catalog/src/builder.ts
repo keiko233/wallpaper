@@ -25,14 +25,16 @@ import {
   configure,
 } from "@zip.js/zip.js";
 import {
-  ResourceCatalogV2Schema,
+  ResourceCatalogV3Schema,
   ResourceManifestSchema,
   RESOURCE_PACKAGE_FILES_DIRECTORY,
   ResourceSiteSchema,
   WallpaperEngineBundleSchema,
+  resolveArtifactEntrypoints,
   validateDependencyGraph,
   type CatalogResource,
   type ResourceDefinition,
+  type ResolvedArtifactEntrypoint,
   type ResourceSite,
   type WallpaperEngineBundle,
 } from "@wallpaper/resource-schema";
@@ -298,8 +300,10 @@ export async function sourceFiles(
 export function entrypointPaths(
   definition: ResourceDefinition,
 ): string[] {
-  return Object.values(definition.artifact.entrypoints).flatMap(
-    (value) => (typeof value === "string" ? [value] : value),
+  return Object.keys(definition.artifact.entrypoints).flatMap((key) =>
+    resolveArtifactEntrypoints(definition.artifact.entrypoints, [key]).flatMap(
+      (entrypoint) => entrypoint.paths,
+    ),
   );
 }
 
@@ -487,21 +491,37 @@ export function configuredEntrypoints(
   definition: ResourceDefinition,
   keys: string[],
 ): string[] {
-  for (const key of keys) {
-    const value = definition.artifact.entrypoints[key];
-    if (typeof value === "string") return [value];
-    if (Array.isArray(value)) return value;
-  }
-  throw new Error(
-    `Missing ${keys.join("/")} entrypoint for ${definition.id}.`,
+  const entrypoints = configuredEntrypointOptions(definition, keys);
+  return entrypoints.find((entrypoint) => entrypoint.isDefault)!.paths;
+}
+
+export function configuredEntrypointOptions(
+  definition: ResourceDefinition,
+  keys: string[],
+): ResolvedArtifactEntrypoint[] {
+  const entrypoints = resolveArtifactEntrypoints(
+    definition.artifact.entrypoints,
+    keys,
   );
+  if (entrypoints.length === 0) {
+    throw new Error(
+      `Missing ${keys.join("/")} entrypoint for ${definition.id}.`,
+    );
+  }
+  return entrypoints;
 }
 
 export function bundledPath(
   definition: ResourceDefinition,
   entrypoint: string,
 ): string {
-  return `/resources/${definition.kind}s/${definition.id}/${entrypoint}`;
+  return `/resources/${resourceDirectory(definition.kind)}/${definition.id}/${entrypoint}`;
+}
+
+export function resourceDirectory(
+  kind: ResourceDefinition["kind"],
+): string {
+  return kind === "skybox" ? "skyboxes" : `${kind}s`;
 }
 
 export function defaultRuntimeId(definition: ResourceDefinition): string {
@@ -514,6 +534,27 @@ export function resolveRuntimeId(
 ): string {
   return overrides[`${definition.id}@${definition.version}`] ??
     defaultRuntimeId(definition);
+}
+
+function runtimeIdForEntrypoint(
+  runtimeId: string,
+  entrypoint: ResolvedArtifactEntrypoint,
+): string {
+  return entrypoint.isDefault || entrypoint.id === null
+    ? runtimeId
+    : `${runtimeId}:${entrypoint.id}`;
+}
+
+function singleEntrypointPath(
+  definition: ResourceDefinition,
+  entrypoint: ResolvedArtifactEntrypoint,
+): string {
+  if (entrypoint.paths.length !== 1) {
+    throw new Error(
+      `${definition.kind} entrypoint ${entrypoint.id ?? "default"} for ${definition.id} must contain exactly one path.`,
+    );
+  }
+  return entrypoint.paths[0]!;
 }
 
 export interface LoadedSite {
@@ -656,12 +697,12 @@ export async function buildRepository(
     left.id < right.id ? -1 : left.id > right.id ? 1 : 0
   );
 
-  const catalog = ResourceCatalogV2Schema.parse({
-    schemaVersion: 2,
+  const catalog = ResourceCatalogV3Schema.parse({
+    schemaVersion: 3,
     repository: loaded.site.repository,
     revision: sha256(
       stableJson({
-        schemaVersion: 2,
+        schemaVersion: 3,
         repository: loaded.site.repository,
         resources,
       }),
@@ -707,6 +748,7 @@ export async function buildWallpaperEngineBundle(
     models: [],
     motions: [],
     stages: [],
+    skyboxes: [],
   };
   const runtimeIds = new Set<string>();
   const resourceIds = new Set<string>();
@@ -727,7 +769,8 @@ export async function buildWallpaperEngineBundle(
       definition.kind !== "motion" &&
       definition.kind !== "audio" &&
       definition.kind !== "camera" &&
-      definition.kind !== "stage"
+      definition.kind !== "stage" &&
+      definition.kind !== "skybox"
     ) {
       continue;
     }
@@ -755,7 +798,7 @@ export async function buildWallpaperEngineBundle(
       const target = resolveBelow(
         wallpaperEngineAssetRoot,
         [
-          `${definition.kind}s`,
+          resourceDirectory(definition.kind),
           definition.id,
           normalizeRelativePath(root, file),
         ].join("/"),
@@ -786,11 +829,34 @@ export async function buildWallpaperEngineBundle(
       }
       case "model": {
         if (isDependencyOnly) break;
-        const [entrypoint] = configuredEntrypoints(definition, ["model"]);
-        resources.models.push({
-          ...base,
-          modelPath: bundledPath(definition, entrypoint!),
-        });
+        for (const entrypoint of configuredEntrypointOptions(definition, [
+          "model",
+        ])) {
+          const entrypointRuntimeId = runtimeIdForEntrypoint(
+            runtimeId,
+            entrypoint,
+          );
+          if (!entrypoint.isDefault) {
+            if (runtimeIds.has(entrypointRuntimeId)) {
+              throw new Error(
+                `Duplicate Wallpaper Engine runtime ID: ${entrypointRuntimeId}`,
+              );
+            }
+            runtimeIds.add(entrypointRuntimeId);
+          }
+          resources.models.push({
+            ...base,
+            id: entrypointRuntimeId,
+            name: entrypoint.name ?? definition.name,
+            ...(entrypoint.remark === undefined
+              ? {}
+              : { remark: entrypoint.remark }),
+            modelPath: bundledPath(
+              definition,
+              singleEntrypointPath(definition, entrypoint),
+            ),
+          });
+        }
         break;
       }
       case "motion": {
@@ -854,11 +920,66 @@ export async function buildWallpaperEngineBundle(
       }
       case "stage": {
         if (isDependencyOnly) break;
-        const [entrypoint] = configuredEntrypoints(definition, ["stage"]);
-        resources.stages.push({
-          ...base,
-          stagePath: bundledPath(definition, entrypoint!),
-        });
+        for (const entrypoint of configuredEntrypointOptions(definition, [
+          "stage",
+        ])) {
+          const entrypointRuntimeId = runtimeIdForEntrypoint(
+            runtimeId,
+            entrypoint,
+          );
+          if (!entrypoint.isDefault) {
+            if (runtimeIds.has(entrypointRuntimeId)) {
+              throw new Error(
+                `Duplicate Wallpaper Engine runtime ID: ${entrypointRuntimeId}`,
+              );
+            }
+            runtimeIds.add(entrypointRuntimeId);
+          }
+          resources.stages.push({
+            ...base,
+            id: entrypointRuntimeId,
+            name: entrypoint.name ?? definition.name,
+            ...(entrypoint.remark === undefined
+              ? {}
+              : { remark: entrypoint.remark }),
+            stagePath: bundledPath(
+              definition,
+              singleEntrypointPath(definition, entrypoint),
+            ),
+          });
+        }
+        break;
+      }
+      case "skybox": {
+        if (isDependencyOnly) break;
+        for (const entrypoint of configuredEntrypointOptions(definition, [
+          "skybox",
+        ])) {
+          const entrypointRuntimeId = runtimeIdForEntrypoint(
+            runtimeId,
+            entrypoint,
+          );
+          if (!entrypoint.isDefault) {
+            if (runtimeIds.has(entrypointRuntimeId)) {
+              throw new Error(
+                `Duplicate Wallpaper Engine runtime ID: ${entrypointRuntimeId}`,
+              );
+            }
+            runtimeIds.add(entrypointRuntimeId);
+          }
+          resources.skyboxes.push({
+            ...base,
+            id: entrypointRuntimeId,
+            name: entrypoint.name ?? definition.name,
+            ...(entrypoint.remark === undefined
+              ? {}
+              : { remark: entrypoint.remark }),
+            skyboxPath: bundledPath(
+              definition,
+              singleEntrypointPath(definition, entrypoint),
+            ),
+          });
+        }
         break;
       }
     }

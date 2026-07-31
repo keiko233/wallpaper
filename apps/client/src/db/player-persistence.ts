@@ -74,6 +74,7 @@ export class DexiePlayerPersistence implements PlayerPersistence {
         modelId: item.modelId,
         motionId: item.motionId,
         stageId: item.stageId,
+        skyboxId: item.skyboxId ?? this.resources.skyboxes[0]!,
       }));
       const selectedIndex = playlistItems.findIndex(
         (item) => item.id === playlist.currentItemId,

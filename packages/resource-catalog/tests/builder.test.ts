@@ -90,11 +90,26 @@ async function makeSite(): Promise<TestSite> {
       artifact: {
         fileName: "example-model.zip",
         format: "zip",
-        entrypoints: { model: "model.pmx" },
+        entrypoints: {
+          model: [
+            {
+              id: "original",
+              name: "Example model",
+              path: "model.pmx",
+              default: true,
+            },
+            {
+              id: "toon-change",
+              name: "Example model (Toon change)",
+              path: "model-toon.pmx",
+            },
+          ],
+        },
       },
     },
     {
       "model.pmx": "model",
+      "model-toon.pmx": "model-toon",
       "textures/body.png": "texture",
     },
     { "cover.webp": "cover" },
@@ -150,12 +165,60 @@ async function makeSite(): Promise<TestSite> {
       artifact: {
         fileName: "example-stage.zip",
         format: "zip",
-        entrypoints: { stage: "stage.pmx" },
+        entrypoints: {
+          stage: [
+            {
+              id: "day",
+              name: "Example stage (Day)",
+              path: "stage.pmx",
+              default: true,
+            },
+            {
+              id: "night",
+              name: "Example stage (Night)",
+              path: "stage-night.pmx",
+            },
+          ],
+        },
       },
     },
     {
       "stage.pmx": "stage",
+      "stage-night.pmx": "stage-night",
       "textures/stage.png": "texture",
+    },
+  );
+  await writeResource(
+    "example-skybox",
+    {
+      id: "example-skybox",
+      version: "1.0.0",
+      kind: "skybox",
+      name: "Example skybox",
+      artifact: {
+        fileName: "example-skybox.zip",
+        format: "zip",
+        entrypoints: {
+          skybox: [
+            {
+              id: "day",
+              name: "Example skybox (Day)",
+              path: "skybox.pmx",
+              default: true,
+            },
+            {
+              id: "sunset",
+              name: "Example skybox (Sunset)",
+              path: "skybox-sunset.pmx",
+            },
+          ],
+        },
+      },
+    },
+    {
+      "skybox.pmx": "skybox",
+      "skybox-sunset.pmx": "skybox-sunset",
+      "textures/sky.png": "texture",
     },
   );
 
@@ -201,7 +264,7 @@ describe("resource catalog builder", () => {
     await writeFile(resolve(modelDirectory, "files/.git/HEAD"), "ref: nested");
 
     const manifests = await loadManifests(loaded);
-    expect(manifests).toHaveLength(5);
+    expect(manifests).toHaveLength(6);
 
     const model = manifests.find(
       ({ definition }) => definition.id === "example-model",
@@ -211,6 +274,7 @@ describe("resource catalog builder", () => {
       model!.directory,
     );
     expect(files.map((file) => file.slice(root.length + 1))).toEqual([
+      "model-toon.pmx",
       "model.pmx",
       "textures/body.png",
     ]);
@@ -394,13 +458,14 @@ describe("resource catalog builder", () => {
     ) as {
       resources: {
         audios: Array<{ audioPath: string }>;
-        models: Array<{ modelPath: string }>;
+        models: Array<{ id: string; name: string; modelPath: string }>;
         motions: Array<{
           motionPath: string[];
           audioPath: string;
           cameraPath?: string;
         }>;
-        stages: Array<{ stagePath: string }>;
+        stages: Array<{ id: string; name: string; stagePath: string }>;
+        skyboxes: Array<{ id: string; name: string; skyboxPath: string }>;
       };
     };
     expect(bundle.resources.audios).toHaveLength(1);
@@ -409,6 +474,16 @@ describe("resource catalog builder", () => {
     );
     expect(bundle.resources.models[0]?.modelPath).toBe(
       "/resources/models/example-model/model.pmx",
+    );
+    expect(bundle.resources.models[0]?.id).toBe(
+      "builtin:model:example-model",
+    );
+    expect(bundle.resources.models[1]).toEqual(
+      expect.objectContaining({
+        id: "builtin:model:example-model:toon-change",
+        name: "Example model (Toon change)",
+        modelPath: "/resources/models/example-model/model-toon.pmx",
+      }),
     );
     expect(bundle.resources.motions[0]?.motionPath).toEqual([
       "/resources/motions/example-motion/motion.vmd",
@@ -422,11 +497,43 @@ describe("resource catalog builder", () => {
     expect(bundle.resources.stages[0]?.stagePath).toBe(
       "/resources/stages/example-stage/stage.pmx",
     );
+    expect(bundle.resources.stages[0]?.id).toBe(
+      "builtin:stage:example-stage",
+    );
+    expect(bundle.resources.stages[1]).toEqual(
+      expect.objectContaining({
+        id: "builtin:stage:example-stage:night",
+        name: "Example stage (Night)",
+        stagePath: "/resources/stages/example-stage/stage-night.pmx",
+      }),
+    );
+    expect(bundle.resources.skyboxes[0]?.skyboxPath).toBe(
+      "/resources/skyboxes/example-skybox/skybox.pmx",
+    );
+    expect(bundle.resources.skyboxes[0]?.id).toBe(
+      "builtin:skybox:example-skybox",
+    );
+    expect(bundle.resources.skyboxes[1]).toEqual(
+      expect.objectContaining({
+        id: "builtin:skybox:example-skybox:sunset",
+        name: "Example skybox (Sunset)",
+        skyboxPath:
+          "/resources/skyboxes/example-skybox/skybox-sunset.pmx",
+      }),
+    );
     await expect(
       access(
         resolve(
           loaded.siteDir,
           "dist/resource-publish/wallpaper-engine-assets/resources/audios/example-audio/example.wav",
+        ),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/wallpaper-engine-assets/resources/skyboxes/example-skybox/textures/sky.png",
         ),
       ),
     ).resolves.toBeUndefined();

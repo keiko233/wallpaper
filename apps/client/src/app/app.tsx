@@ -36,6 +36,7 @@ import type {
 const EMPTY_BUNDLED_RESOURCES: BundledPlayerResources = {
   models: [],
   motions: [],
+  skyboxes: [],
   stages: [],
 };
 
@@ -51,6 +52,7 @@ export default function WallpaperClientApp({
       ...bundledResources,
       models: [...bundledResources.models],
       motions: [...bundledResources.motions],
+      skyboxes: [...bundledResources.skyboxes],
       stages: [...bundledResources.stages],
       dispose: () => undefined,
     });
@@ -107,6 +109,7 @@ export default function WallpaperClientApp({
         resources: {
           models: materialized.models.map((item) => item.id),
           motions: materialized.motions.map((item) => item.id),
+          skyboxes: materialized.skyboxes.map((item) => item.id),
           stages: materialized.stages.map((item) => item.id),
         },
       }),
@@ -128,6 +131,7 @@ export default function WallpaperClientApp({
             }
           />
         }
+        skyboxes={materialized.skyboxes}
         stages={materialized.stages}
       />
 

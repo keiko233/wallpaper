@@ -265,15 +265,15 @@ export class ResourceSourceService {
   ): Promise<SourceRefreshResult> {
     const now = new Date().toISOString();
     const name =
-      catalog.schemaVersion === 2
+      catalog.schemaVersion !== 1
         ? catalog.repository.name
         : deriveSourceDisplayName(source.catalogUrl);
     const description =
-      catalog.schemaVersion === 2
+      catalog.schemaVersion !== 1
         ? catalog.repository.description
         : null;
     const homepage =
-      catalog.schemaVersion === 2 ? catalog.repository.homepage : null;
+      catalog.schemaVersion !== 1 ? catalog.repository.homepage : null;
 
     await this.database.transaction(
       "rw",

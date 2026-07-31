@@ -21,6 +21,7 @@ const emptyBundle: WallpaperEngineBundle = {
     audios: [],
     models: [],
     motions: [],
+    skyboxes: [],
     stages: [],
   },
 };

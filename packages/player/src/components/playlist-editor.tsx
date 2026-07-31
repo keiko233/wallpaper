@@ -38,12 +38,13 @@ function createPlaylistId(): string {
 }
 
 export function PlaylistEditor() {
-  const { models, motions, stages, playlist, playlistIndex } =
+  const { models, motions, stages, skyboxes, playlist, playlistIndex } =
     useMmdState();
   const { setPlaylist, selectPlaylistItem, resetPlaylist } = useMmdActions();
   const [modelIndex, setModelIndex] = useState(0);
   const [motionIndex, setMotionIndex] = useState(0);
   const [stageIndex, setStageIndex] = useState(0);
+  const [skyboxIndex, setSkyboxIndex] = useState(0);
 
   const activeId = playlist[playlistIndex].id;
 
@@ -60,7 +61,10 @@ export function PlaylistEditor() {
   const updateItem = (
     index: number,
     update: Partial<
-      Pick<MmdPlaylistItem, "modelId" | "motionId" | "stageId">
+      Pick<
+        MmdPlaylistItem,
+        "modelId" | "motionId" | "stageId" | "skyboxId"
+      >
     >,
   ) => {
     commitPlaylist(
@@ -96,6 +100,7 @@ export function PlaylistEditor() {
         modelId: models[modelIndex].id,
         motionId: motions[motionIndex].id,
         stageId: stages[stageIndex].id,
+        skyboxId: skyboxes[skyboxIndex].id,
       },
     ];
     commitPlaylist(next);
@@ -112,7 +117,7 @@ export function PlaylistEditor() {
         <DialogHeader>
           <DialogTitle>Playlist</DialogTitle>
           <DialogDescription>
-            Combine any model, motion, and stage. Audio and camera follow
+            Combine any model, motion, stage, and skybox. Audio and camera follow
             the selected motion. The list loops continuously and is saved
             automatically on this device.
           </DialogDescription>
@@ -123,7 +128,7 @@ export function PlaylistEditor() {
             {playlist.map((item, index) => (
               <div
                 className={cn(
-                  "grid grid-cols-[1.5rem_repeat(3,minmax(0,1fr))_auto] items-center gap-2 rounded-xl border p-2 transition-colors",
+                  "grid grid-cols-[1.5rem_repeat(4,minmax(0,1fr))_auto] items-center gap-2 rounded-xl border p-2 transition-colors",
                   index === playlistIndex && "border-primary/50 bg-primary/5",
                 )}
                 key={item.id}
@@ -212,6 +217,32 @@ export function PlaylistEditor() {
                   </SelectContent>
                 </Select>
 
+                <Select
+                  onValueChange={(value) => {
+                    if (value !== null) {
+                      updateItem(index, { skyboxId: value });
+                    }
+                  }}
+                  value={item.skyboxId}
+                >
+                  <SelectTrigger aria-label={`Skybox for item ${index + 1}`}>
+                    <SelectValue>
+                      {
+                        skyboxes.find(
+                          (skybox) => skybox.id === item.skyboxId,
+                        )!.name
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skyboxes.map((skybox) => (
+                      <SelectItem key={skybox.id} value={skybox.id}>
+                        {skybox.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 <div className="flex gap-1">
                   <Button
                     aria-label={`Move item ${index + 1} up`}
@@ -258,7 +289,7 @@ export function PlaylistEditor() {
                 Add
               </Button>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <div className="space-y-1.5">
                 <Label>Model</Label>
                 <Select
@@ -314,6 +345,26 @@ export function PlaylistEditor() {
                     {stages.map((stage, index) => (
                       <SelectItem key={stage.id} value={String(index)}>
                         {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Skybox</Label>
+                <Select
+                  onValueChange={(value) => {
+                    if (value !== null) setSkyboxIndex(Number(value));
+                  }}
+                  value={String(skyboxIndex)}
+                >
+                  <SelectTrigger>
+                    <SelectValue>{skyboxes[skyboxIndex].name}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skyboxes.map((skybox, index) => (
+                      <SelectItem key={skybox.id} value={String(index)}>
+                        {skybox.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

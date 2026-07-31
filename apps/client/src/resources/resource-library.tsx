@@ -24,6 +24,7 @@ import {
   useMemo,
   useState,
   type FormEvent,
+  type ReactNode,
 } from "react";
 import {
   Alert,
@@ -72,6 +73,7 @@ import type {
   InstallProgress,
   ResourceClient,
   ResourceSummary,
+  InstalledResourceSummary,
 } from "./resource-client";
 
 const kinds: { label: string; value: ResourceKind | "all" }[] = [
@@ -80,6 +82,7 @@ const kinds: { label: string; value: ResourceKind | "all" }[] = [
   { label: "Motions", value: "motion" },
   { label: "Audio", value: "audio" },
   { label: "Stages", value: "stage" },
+  { label: "Skyboxes", value: "skybox" },
   { label: "Videos", value: "video" },
 ];
 
@@ -89,6 +92,7 @@ const kindIcons = {
   model: PersonStanding,
   motion: Clapperboard,
   stage: Image,
+  skybox: Image,
   video: Box,
 } as const;
 
@@ -120,7 +124,18 @@ function formatTimestamp(value: string | null): string {
   }).format(new Date(value));
 }
 
-function ResourceCover({ resource }: { resource: ResourceSummary }) {
+interface ResourceCardData {
+  localResourceId: string;
+  name: string;
+  kind: ResourceKind;
+  description: string | null;
+  categories: readonly string[];
+  tags: readonly string[];
+  sourceName: string;
+  coverUrl: string | null;
+}
+
+function ResourceCover({ resource }: { resource: ResourceCardData }) {
   if (resource.coverUrl !== null) {
     return (
       <img
@@ -143,6 +158,71 @@ function ResourceCover({ resource }: { resource: ResourceSummary }) {
   );
 }
 
+function ResourceCard({
+  resource,
+  sourceAvailable = true,
+  sourceIsDefault = false,
+  action,
+  children,
+}: {
+  resource: ResourceCardData;
+  sourceAvailable?: boolean;
+  sourceIsDefault?: boolean;
+  action: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border bg-card/55 p-4 shadow-sm backdrop-blur-xl">
+      <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
+        <ResourceCover resource={resource} />
+        <div className="flex min-w-0 items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate font-medium">{resource.name}</h3>
+              <Badge variant="outline">{resource.kind}</Badge>
+              <Badge variant={sourceAvailable ? "info" : "outline"}>
+                <Server />
+                {resource.sourceName}
+              </Badge>
+              {sourceAvailable ? null : (
+                <Badge variant="secondary">Source removed</Badge>
+              )}
+              {sourceIsDefault ? (
+                <Badge variant="secondary">Default</Badge>
+              ) : null}
+            </div>
+            {resource.description === null ? null : (
+              <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
+                {resource.description}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1">
+              {resource.categories.map((category) => (
+                <Badge
+                  key={`category:${category}`}
+                  size="sm"
+                  variant="outline"
+                >
+                  {category}
+                </Badge>
+              ))}
+              {resource.tags.map((tag) => (
+                <Badge key={tag} size="sm" variant="secondary">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            {action}
+          </div>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function ResourceLibrary({
   client,
   onLibraryChanged,
@@ -150,9 +230,9 @@ export function ResourceLibrary({
   client: ResourceClient;
   onLibraryChanged: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<"browse" | "sources">(
-    "browse",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "browse" | "installed" | "sources"
+  >("browse");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState<ResourceKind | "all">("all");
   const [result, setResult] = useState<CatalogSearchOutput | null>(
@@ -161,6 +241,9 @@ export function ResourceLibrary({
   const [installedIds, setInstalledIds] = useState<Set<string>>(
     new Set(),
   );
+  const [installedResources, setInstalledResources] = useState<
+    InstalledResourceSummary[]
+  >([]);
   const [installing, setInstalling] = useState<{
     id: string;
     progress: InstallProgress;
@@ -174,6 +257,13 @@ export function ResourceLibrary({
   const [removeSourceId, setRemoveSourceId] = useState<string | null>(
     null,
   );
+  const [resourceToDelete, setResourceToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [deletingResourceId, setDeletingResourceId] = useState<
+    string | null
+  >(null);
 
   const sourceById = useMemo(
     () => new Map(sources.map((source) => [source.id, source])),
@@ -208,6 +298,10 @@ export function ResourceLibrary({
     [client],
   );
 
+  const refreshInstalledResources = useCallback(async () => {
+    setInstalledResources(await client.listInstalled());
+  }, [client]);
+
   const search = useCallback(
     async (cursor?: string) => {
       setIsSearching(true);
@@ -229,13 +323,17 @@ export function ResourceLibrary({
         setResult(combined);
         await Promise.all([
           refreshInstalled(combined.items),
+          refreshInstalledResources(),
           refreshSources(),
         ]);
       } catch (cause) {
         setBrowseError(
           cause instanceof Error ? cause.message : String(cause),
         );
-        await refreshSources();
+        await Promise.all([
+          refreshInstalledResources(),
+          refreshSources(),
+        ]);
       } finally {
         setIsSearching(false);
       }
@@ -245,6 +343,7 @@ export function ResourceLibrary({
       kind,
       query,
       refreshInstalled,
+      refreshInstalledResources,
       refreshSources,
       result,
     ],
@@ -270,6 +369,7 @@ export function ResourceLibrary({
       setInstalledIds((current) =>
         new Set(current).add(item.localResourceId),
       );
+      await refreshInstalledResources();
       onLibraryChanged();
     } catch (cause) {
       setBrowseError(
@@ -277,6 +377,29 @@ export function ResourceLibrary({
       );
     } finally {
       setInstalling(null);
+    }
+  }
+
+  async function deleteInstalledResource() {
+    if (resourceToDelete === null) return;
+    setBrowseError(null);
+    setDeletingResourceId(resourceToDelete.id);
+    try {
+      await client.uninstall(resourceToDelete.id);
+      setInstalledIds((current) => {
+        const next = new Set(current);
+        next.delete(resourceToDelete.id);
+        return next;
+      });
+      await refreshInstalledResources();
+      setResourceToDelete(null);
+      onLibraryChanged();
+    } catch (cause) {
+      setBrowseError(
+        cause instanceof Error ? cause.message : String(cause),
+      );
+    } finally {
+      setDeletingResourceId(null);
     }
   }
 
@@ -382,14 +505,16 @@ export function ResourceLibrary({
           <DialogHeader>
             <DialogTitle>Resource library</DialogTitle>
             <DialogDescription>
-              Browse independent resource sources and cache installed
-              artifacts on this device.
+              Browse independent resource sources and manage artifacts
+              installed on this device.
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             <Tabs
               onValueChange={(value) =>
-                setActiveTab(value as "browse" | "sources")
+                setActiveTab(
+                  value as "browse" | "installed" | "sources",
+                )
               }
               value={activeTab}
             >
@@ -397,6 +522,13 @@ export function ResourceLibrary({
                 <TabsTab value="browse">
                   <Search />
                   Browse
+                </TabsTab>
+                <TabsTab value="installed">
+                  <Check />
+                  Installed
+                  <Badge size="sm" variant="secondary">
+                    {installedResources.length}
+                  </Badge>
                 </TabsTab>
                 <TabsTab value="sources">
                   <Server />
@@ -415,7 +547,7 @@ export function ResourceLibrary({
                   <Input
                     aria-label="Search resources"
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search models, motions, music…"
+                    placeholder="Search models, motions, stages, skyboxes…"
                     type="search"
                     value={query}
                   />
@@ -481,13 +613,24 @@ export function ResourceLibrary({
                           catalog.json.
                         </p>
                       </div>
-                      <Button
-                        onClick={() => setActiveTab("sources")}
-                        variant="outline"
-                      >
-                        <Plus />
-                        Add source
-                      </Button>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {installedResources.length === 0 ? null : (
+                          <Button
+                            onClick={() => setActiveTab("installed")}
+                            variant="outline"
+                          >
+                            <Check />
+                            View installed resources
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => setActiveTab("sources")}
+                          variant="outline"
+                        >
+                          <Plus />
+                          Add source
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ) : (
@@ -507,71 +650,45 @@ export function ResourceLibrary({
                       );
                       const source = sourceById.get(item.sourceId);
                       return (
-                        <div
-                          className="rounded-xl border bg-card/55 p-4 shadow-sm backdrop-blur-xl"
-                          key={item.localResourceId}
-                        >
-                          <div className="grid gap-4 sm:grid-cols-[9rem_minmax(0,1fr)]">
-                            <ResourceCover resource={item} />
-                            <div className="flex min-w-0 items-start justify-between gap-4">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="truncate font-medium">
-                                    {item.name}
-                                  </h3>
-                                  <Badge variant="outline">
-                                    {item.kind}
-                                  </Badge>
-                                  <Badge variant="info">
-                                    <Server />
-                                    {item.sourceName}
-                                  </Badge>
-                                  {source?.isDefault ? (
-                                    <Badge variant="secondary">
-                                      Default
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                                {item.description === null ? null : (
-                                  <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
-                                    {item.description}
-                                  </p>
-                                )}
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {item.categories.map((category) => (
-                                    <Badge
-                                      key={`category:${category}`}
-                                      size="sm"
-                                      variant="outline"
-                                    >
-                                      {category}
-                                    </Badge>
-                                  ))}
-                                  {item.tags.map((tag) => (
-                                    <Badge
-                                      key={tag}
-                                      size="sm"
-                                      variant="secondary"
-                                    >
-                                      {tag}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
+                        <ResourceCard
+                          action={
+                            installed ? (
+                              <>
+                                <Button disabled size="sm" variant="outline">
+                                  <Check />
+                                  Installed
+                                </Button>
+                                <Button
+                                  disabled={deletingResourceId !== null}
+                                  onClick={() =>
+                                    setResourceToDelete({
+                                      id: item.localResourceId,
+                                      name: item.name,
+                                    })
+                                  }
+                                  size="sm"
+                                  variant="destructive-outline"
+                                >
+                                  <Trash2 />
+                                  Delete
+                                </Button>
+                              </>
+                            ) : (
                               <Button
-                                disabled={installed || installing !== null}
+                                disabled={installing !== null}
                                 loading={progress !== null}
                                 onClick={() => void install(item)}
                                 size="sm"
-                                variant={
-                                  installed ? "outline" : "default"
-                                }
                               >
-                                {installed ? <Check /> : <Download />}
-                                {installed ? "Installed" : "Add"}
+                                <Download />
+                                Add
                               </Button>
-                            </div>
-                          </div>
+                            )
+                          }
+                          key={item.localResourceId}
+                          resource={item}
+                          sourceIsDefault={source?.isDefault === true}
+                        >
                           {progress === null ? null : (
                             <div className="mt-3 space-y-1.5">
                               <Progress
@@ -589,7 +706,7 @@ export function ResourceLibrary({
                               </p>
                             </div>
                           )}
-                        </div>
+                        </ResourceCard>
                       );
                     })}
                   </div>
@@ -606,6 +723,53 @@ export function ResourceLibrary({
                     Load more
                   </Button>
                 )}
+              </TabsPanel>
+
+              <TabsPanel className="space-y-4 pt-2" value="installed">
+                {browseError === null ? null : (
+                  <Alert variant="error">
+                    <AlertCircle />
+                    <AlertTitle>Resource operation failed</AlertTitle>
+                    <AlertDescription>{browseError}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="max-h-[55dvh] space-y-2 overflow-y-auto pe-1">
+                  {installedResources.length === 0 ? (
+                    <p className="rounded-xl border border-dashed py-10 text-center text-muted-foreground text-sm">
+                      No resources are installed on this device.
+                    </p>
+                  ) : null}
+                  {installedResources.map((item) => (
+                    <ResourceCard
+                      action={
+                        <Button
+                          loading={deletingResourceId === item.localResourceId}
+                          onClick={() =>
+                            setResourceToDelete({
+                              id: item.localResourceId,
+                              name: item.name,
+                            })
+                          }
+                          size="sm"
+                          variant="destructive-outline"
+                        >
+                          <Trash2 />
+                          Delete
+                        </Button>
+                      }
+                      key={item.localResourceId}
+                      resource={item}
+                      sourceAvailable={item.sourceAvailable}
+                    >
+                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>Version {item.version}</span>
+                        {item.ready ? null : (
+                          <Badge variant="warning">Incomplete</Badge>
+                        )}
+                      </div>
+                    </ResourceCard>
+                  ))}
+                </div>
               </TabsPanel>
 
               <TabsPanel className="space-y-4 pt-2" value="sources">
@@ -807,6 +971,48 @@ export function ResourceLibrary({
               variant="destructive"
             >
               Delete installed resources
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogPopup>
+      </AlertDialog>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open && deletingResourceId === null) {
+            setResourceToDelete(null);
+          }
+        }}
+        open={resourceToDelete !== null}
+      >
+        <AlertDialogPopup>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {resourceToDelete?.name ?? "installed resource"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the resource from the player and deletes its local
+              files when they are not shared by another installed resource.
+              The resource source remains configured.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogClose
+              render={
+                <Button
+                  disabled={deletingResourceId !== null}
+                  variant="ghost"
+                />
+              }
+            >
+              Cancel
+            </AlertDialogClose>
+            <Button
+              loading={deletingResourceId === resourceToDelete?.id}
+              onClick={() => void deleteInstalledResource()}
+              variant="destructive"
+            >
+              <Trash2 />
+              Delete resource
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

@@ -22,11 +22,19 @@ export interface StageList {
   remark?: string;
 }
 
+export interface SkyboxList {
+  id: string;
+  name: string;
+  skyboxPath: string | null;
+  remark?: string;
+}
+
 export interface MmdPlaylistItem {
   id: string;
   modelId: string;
   motionId: string;
   stageId: string;
+  skyboxId: string;
 }
 
 export interface PersistedPlayerState {

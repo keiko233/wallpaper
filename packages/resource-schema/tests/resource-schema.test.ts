@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   ResourceCatalogSchema,
   ResourceCatalogV2Schema,
+  ResourceCatalogV3Schema,
   ResourceDefinitionsSchema,
   ResourceManifestSchema,
   ResourceSiteSchema,
   WallpaperEngineBundleSchema,
   WallpaperEngineSelectionSchema,
   normalizeResourceSourceUrl,
+  resolveArtifactEntrypoints,
   resolveCatalogAssetUrl,
 } from "../src";
 
@@ -133,6 +135,7 @@ describe("resource schema", () => {
             },
           ],
           motions: [],
+          skyboxes: [],
           stages: [],
         },
       }),
@@ -154,7 +157,58 @@ describe("resource schema", () => {
     expect(catalog.repository.name).toBe("Example Repository");
   });
 
-  it("accepts both v1 and v2 catalogs through ResourceCatalogSchema", () => {
+  it("requires catalog v3 for selectable entrypoint variants", () => {
+    const resource = {
+      ...definition,
+      authors: [],
+      license: null,
+      categories: [],
+      tags: ["miku"],
+      compatibility: {
+        platforms: ["web", "wallpaper-engine"],
+        features: [],
+      },
+      visibility: "public",
+      dependencies: [],
+      cover: null,
+      artifact: {
+        path: "objects/model/example.zip",
+        fileName: "example.zip",
+        format: "zip",
+        contentType: "application/zip",
+        byteSize: 123,
+        sha256: "b".repeat(64),
+        entrypoints: {
+          model: [
+            {
+              id: "original",
+              name: "Example model",
+              path: "model.pmx",
+              default: true,
+            },
+            {
+              id: "toon-change",
+              name: "Example model (Toon change)",
+              path: "model-toon.pmx",
+            },
+          ],
+        },
+      },
+    };
+    const catalog = {
+      schemaVersion: 3,
+      repository: { name: "Example" },
+      revision: "c".repeat(64),
+      resources: [resource],
+    };
+
+    expect(ResourceCatalogV3Schema.parse(catalog)).toBeDefined();
+    expect(() =>
+      ResourceCatalogV2Schema.parse({ ...catalog, schemaVersion: 2 }),
+    ).toThrow(/schemaVersion 3/u);
+  });
+
+  it("accepts v1, v2, and v3 catalogs through ResourceCatalogSchema", () => {
     expect(
       ResourceCatalogSchema.parse({
         schemaVersion: 1,
@@ -167,6 +221,14 @@ describe("resource schema", () => {
         schemaVersion: 2,
         repository: { name: "Example" },
         revision: "b".repeat(64),
+        resources: [],
+      }),
+    ).toBeDefined();
+    expect(
+      ResourceCatalogSchema.parse({
+        schemaVersion: 3,
+        repository: { name: "Example" },
+        revision: "c".repeat(64),
         resources: [],
       }),
     ).toBeDefined();
@@ -223,6 +285,107 @@ describe("resource schema", () => {
     });
     expect(parsed.kind).toBe("camera");
     expect(parsed.visibility).toBe("dependency-only");
+  });
+
+  it("normalizes selectable model entrypoints with one stable default", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      artifact: {
+        ...definition.artifact,
+        entrypoints: {
+          model: [
+            {
+              id: "original",
+              name: "Example model",
+              path: "model.pmx",
+              default: true,
+            },
+            {
+              id: "toon-change",
+              name: "Example model (Toon change)",
+              path: "model-toon.pmx",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(
+      resolveArtifactEntrypoints(parsed.artifact.entrypoints, ["model"]),
+    ).toEqual([
+      {
+        id: "original",
+        name: "Example model",
+        paths: ["model.pmx"],
+        isDefault: true,
+      },
+      {
+        id: "toon-change",
+        name: "Example model (Toon change)",
+        paths: ["model-toon.pmx"],
+        isDefault: false,
+      },
+    ]);
+  });
+
+  it("accepts selectable skybox entrypoints", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "skybox",
+      artifact: {
+        ...definition.artifact,
+        entrypoints: {
+          skybox: [
+            {
+              id: "day",
+              name: "Cloud sky (Day)",
+              path: "sky-day.pmx",
+              default: true,
+            },
+            {
+              id: "sunset",
+              name: "Cloud sky (Sunset)",
+              path: "sky-sunset.pmx",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(
+      resolveArtifactEntrypoints(parsed.artifact.entrypoints, ["skybox"]),
+    ).toHaveLength(2);
+  });
+
+  it("rejects ambiguous or unsupported selectable entrypoints", () => {
+    const variants = [
+      { id: "a", name: "A", path: "a.pmx" },
+      { id: "b", name: "B", path: "b.pmx" },
+    ];
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        artifact: {
+          ...definition.artifact,
+          entrypoints: { model: variants },
+        },
+      }),
+    ).toThrow(/exactly one default/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        kind: "audio",
+        artifact: {
+          ...definition.artifact,
+          entrypoints: {
+            audio: [
+              { ...variants[0], default: true },
+              variants[1],
+            ],
+          },
+        },
+      }),
+    ).toThrow(/only for model, stage, and skybox/u);
   });
 });
 

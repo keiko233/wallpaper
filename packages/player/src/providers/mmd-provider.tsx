@@ -28,11 +28,13 @@ import {
   type ModelList,
   type MotionList,
   type PlayerPersistence,
+  type SkyboxList,
   type StageList,
 } from "../types";
 import {
   DEFAULT_MODELS,
   DEFAULT_MOTIONS,
+  DEFAULT_SKYBOXES,
   DEFAULT_STAGES,
 } from "../defaults";
 import { MmdController } from "../lib/babylon/MmdController";
@@ -45,6 +47,7 @@ export interface MmdProviderProps {
   children: ReactNode;
   models?: readonly ModelList[];
   motions?: readonly MotionList[];
+  skyboxes?: readonly SkyboxList[];
   stages?: readonly StageList[];
   initialModelIndex?: number;
   initialMotionIndex?: number;
@@ -238,6 +241,7 @@ function createDefaultPlaylist(
   models: readonly ModelList[],
   motions: readonly MotionList[],
   stages: readonly StageList[],
+  skyboxes: readonly SkyboxList[],
 ): MmdPlaylistItem[] {
   return models.flatMap((_, modelIndex) =>
     motions.map((__, motionIndex) => ({
@@ -245,6 +249,7 @@ function createDefaultPlaylist(
       modelId: models[modelIndex].id,
       motionId: motions[motionIndex].id,
       stageId: stages[0].id,
+      skyboxId: skyboxes[0].id,
     })),
   );
 }
@@ -254,14 +259,16 @@ function normalizePlaylist(
   models: readonly ModelList[],
   motions: readonly MotionList[],
   stages: readonly StageList[],
+  skyboxes: readonly SkyboxList[],
 ): MmdPlaylistItem[] {
   if (!Array.isArray(value)) {
-    return createDefaultPlaylist(models, motions, stages);
+    return createDefaultPlaylist(models, motions, stages, skyboxes);
   }
 
   const modelIds = new Set(models.map((model) => model.id));
   const motionIds = new Set(motions.map((motion) => motion.id));
   const stageIds = new Set(stages.map((stage) => stage.id));
+  const skyboxIds = new Set(skyboxes.map((skybox) => skybox.id));
   const seenIds = new Set<string>();
   const normalized = value.flatMap((item, index): MmdPlaylistItem[] => {
     if (typeof item !== "object" || item === null) return [];
@@ -270,6 +277,7 @@ function normalizePlaylist(
       modelIndex?: number;
       motionIndex?: number;
       stageIndex?: number;
+      skyboxIndex?: number;
     };
     const modelId =
       typeof candidate.modelId === "string"
@@ -289,13 +297,21 @@ function normalizePlaylist(
         : Number.isInteger(candidate.stageIndex)
           ? stages[candidate.stageIndex!]?.id
           : stages[0].id;
+    const skyboxId =
+      typeof candidate.skyboxId === "string"
+        ? candidate.skyboxId
+        : Number.isInteger(candidate.skyboxIndex)
+          ? skyboxes[candidate.skyboxIndex!]?.id
+          : skyboxes[0].id;
     if (
       modelId === undefined ||
       motionId === undefined ||
       stageId === undefined ||
+      skyboxId === undefined ||
       !modelIds.has(modelId) ||
       !motionIds.has(motionId) ||
-      !stageIds.has(stageId)
+      !stageIds.has(stageId) ||
+      !skyboxIds.has(skyboxId)
     ) {
       return [];
     }
@@ -315,13 +331,14 @@ function normalizePlaylist(
         modelId,
         motionId,
         stageId,
+        skyboxId,
       },
     ];
   });
 
   return normalized.length > 0
     ? normalized
-    : createDefaultPlaylist(models, motions, stages);
+    : createDefaultPlaylist(models, motions, stages, skyboxes);
 }
 
 function getResourceKey(
@@ -329,17 +346,22 @@ function getResourceKey(
   models: readonly ModelList[],
   motions: readonly MotionList[],
   stages: readonly StageList[],
+  skyboxes: readonly SkyboxList[],
 ): string {
   const model = models.find((candidate) => candidate.id === item.modelId)!;
   const motion = motions.find((candidate) => candidate.id === item.motionId)!;
   const stage = stages.find((candidate) => candidate.id === item.stageId)!;
-  return `${item.id}|${model.modelPath}|${stage.stagePath ?? "solid-color"}|${motion.audioPath}|${motion.cameraPath ?? "default-camera"}|${motion.motionPath.join("|")}|camera-delay-${motion.cameraDelaySeconds ?? 0}`;
+  const skybox = skyboxes.find(
+    (candidate) => candidate.id === item.skyboxId,
+  )!;
+  return `${item.id}|${model.modelPath}|${stage.stagePath ?? "solid-color"}|${skybox.skyboxPath ?? "no-skybox"}|${motion.audioPath}|${motion.cameraPath ?? "default-camera"}|${motion.motionPath.join("|")}|camera-delay-${motion.cameraDelaySeconds ?? 0}`;
 }
 
 export function MmdProvider({
   children,
   models = DEFAULT_MODELS,
   motions = DEFAULT_MOTIONS,
+  skyboxes = DEFAULT_SKYBOXES,
   stages = DEFAULT_STAGES,
   initialModelIndex = 0,
   initialMotionIndex = 0,
@@ -351,10 +373,11 @@ export function MmdProvider({
   if (
     models.length === 0 ||
     motions.length === 0 ||
-    stages.length === 0
+    stages.length === 0 ||
+    skyboxes.length === 0
   ) {
     throw new Error(
-      "MmdProvider requires at least one model, motion, and stage.",
+      "MmdProvider requires at least one model, motion, stage, and skybox option.",
     );
   }
 
@@ -362,8 +385,8 @@ export function MmdProvider({
   assertIndex(initialMotionIndex, motions.length, "initial motion");
 
   const defaultPlaylist = useMemo(
-    () => createDefaultPlaylist(models, motions, stages),
-    [models, motions, stages],
+    () => createDefaultPlaylist(models, motions, stages, skyboxes),
+    [models, motions, stages, skyboxes],
   );
   const [storedPlaylist, setStoredPlaylist] = useState<MmdPlaylistItem[]>(
     defaultPlaylist,
@@ -375,8 +398,9 @@ export function MmdProvider({
         models,
         motions,
         stages,
+        skyboxes,
       ),
-    [storedPlaylist, models, motions, stages],
+    [storedPlaylist, models, motions, stages, skyboxes],
   );
   const [storedPlaylistIndex, setStoredPlaylistIndex] = useState(0);
   const [background, setBackgroundState] = useState(() =>
@@ -421,6 +445,7 @@ export function MmdProvider({
               models,
               motions,
               stages,
+              skyboxes,
             ),
           );
         }
@@ -463,6 +488,7 @@ export function MmdProvider({
     models,
     motions,
     stages,
+    skyboxes,
     initialBackground,
     initialVolume,
     initialPlaybackRate,
@@ -518,9 +544,13 @@ export function MmdProvider({
   const stageIndex = stages.findIndex(
     (candidate) => candidate.id === playlistItem.stageId,
   );
+  const skyboxIndex = skyboxes.findIndex(
+    (candidate) => candidate.id === playlistItem.skyboxId,
+  );
   const model = models[modelIndex];
   const motion = motions[motionIndex];
   const stage = stages[stageIndex];
+  const skybox = skyboxes[skyboxIndex];
 
   const [canvases, setCanvases] = useState<
     [HTMLCanvasElement | null, HTMLCanvasElement | null]
@@ -602,13 +632,14 @@ export function MmdProvider({
           models,
           motions,
           stages,
+          skyboxes,
         );
         const next =
           typeof value === "function" ? value(normalizedCurrent) : value;
-        return normalizePlaylist(next, models, motions, stages);
+        return normalizePlaylist(next, models, motions, stages, skyboxes);
       });
     },
-    [models, motions, stages, markPersistenceDirty],
+    [models, motions, stages, skyboxes, markPersistenceDirty],
   );
 
   const loadSlot = useCallback(
@@ -638,6 +669,9 @@ export function MmdProvider({
       const targetStage = stages.find(
         (candidate) => candidate.id === item.stageId,
       )!;
+      const targetSkybox = skyboxes.find(
+        (candidate) => candidate.id === item.skyboxId,
+      )!;
       targetController.setOnEnded(null);
       slotKeysRef.current[slot] = null;
       loadingKeysRef.current[slot] = key;
@@ -646,6 +680,7 @@ export function MmdProvider({
         .load(canvas, {
           modelPath: targetModel.modelPath,
           stagePath: targetStage.stagePath,
+          skyboxPath: targetSkybox.skyboxPath,
           motionPath: targetMotion.motionPath,
           audioPath: targetMotion.audioPath,
           cameraPath: targetMotion.cameraPath,
@@ -669,7 +704,7 @@ export function MmdProvider({
       loadingPromisesRef.current[slot] = promise;
       return promise;
     },
-    [canvases, controllers, models, motions, stages],
+    [canvases, controllers, models, motions, stages, skyboxes],
   );
 
   handleTrackEndRef.current = () => {
@@ -691,6 +726,7 @@ export function MmdProvider({
     models,
     motions,
     stages,
+    skyboxes,
   )}|reload-${reloadVersion}`;
 
   useEffect(() => {
@@ -788,6 +824,7 @@ export function MmdProvider({
         models,
         motions,
         stages,
+        skyboxes,
       )}|reload-${reloadVersion}`;
       if (slotKeysRef.current.includes(nextKey)) return;
 
@@ -814,6 +851,7 @@ export function MmdProvider({
     models,
     motions,
     stages,
+    skyboxes,
     reloadVersion,
     loadSlot,
   ]);
@@ -823,7 +861,7 @@ export function MmdProvider({
       update: Partial<
         Pick<
           MmdPlaylistItem,
-          "modelId" | "motionId" | "stageId"
+          "modelId" | "motionId" | "stageId" | "skyboxId"
         >
       >,
     ) => {
@@ -857,6 +895,13 @@ export function MmdProvider({
     },
     [stages, updateCurrentItem],
   );
+  const selectSkybox = useCallback(
+    (index: number): void => {
+      assertIndex(index, skyboxes.length, "skybox");
+      updateCurrentItem({ skyboxId: skyboxes[index].id });
+    },
+    [skyboxes, updateCurrentItem],
+  );
   const previousModel = useCallback(() => {
     selectModel(wrapIndex(modelIndex - 1, models.length));
   }, [modelIndex, models.length, selectModel]);
@@ -875,6 +920,12 @@ export function MmdProvider({
   const nextStage = useCallback(() => {
     selectStage(wrapIndex(stageIndex + 1, stages.length));
   }, [selectStage, stageIndex, stages.length]);
+  const previousSkybox = useCallback(() => {
+    selectSkybox(wrapIndex(skyboxIndex - 1, skyboxes.length));
+  }, [selectSkybox, skyboxIndex, skyboxes.length]);
+  const nextSkybox = useCallback(() => {
+    selectSkybox(wrapIndex(skyboxIndex + 1, skyboxes.length));
+  }, [selectSkybox, skyboxIndex, skyboxes.length]);
   const selectPlaylistItem = useCallback(
     (index: number) => {
       assertIndex(index, playlist.length, "playlist");
@@ -980,12 +1031,15 @@ export function MmdProvider({
       models,
       motions,
       stages,
+      skyboxes,
       modelIndex,
       motionIndex,
       stageIndex,
+      skyboxIndex,
       model,
       motion,
       stage,
+      skybox,
       playlist,
       playlistIndex: safePlaylistIndex,
       isPreloading,
@@ -1001,12 +1055,15 @@ export function MmdProvider({
       models,
       motions,
       stages,
+      skyboxes,
       modelIndex,
       motionIndex,
       stageIndex,
+      skyboxIndex,
       model,
       motion,
       stage,
+      skybox,
       playlist,
       safePlaylistIndex,
       isPreloading,
@@ -1024,12 +1081,15 @@ export function MmdProvider({
       selectModel,
       selectMotion,
       selectStage,
+      selectSkybox,
       previousModel,
       nextModel,
       previousMotion,
       nextMotion,
       previousStage,
       nextStage,
+      previousSkybox,
+      nextSkybox,
       selectPlaylistItem,
       previousPlaylistItem,
       nextPlaylistItem,
@@ -1050,12 +1110,15 @@ export function MmdProvider({
       selectModel,
       selectMotion,
       selectStage,
+      selectSkybox,
       previousModel,
       nextModel,
       previousMotion,
       nextMotion,
       previousStage,
       nextStage,
+      previousSkybox,
+      nextSkybox,
       selectPlaylistItem,
       previousPlaylistItem,
       nextPlaylistItem,

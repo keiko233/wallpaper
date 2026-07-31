@@ -45,6 +45,9 @@ import { resolvePlayerResourceUrl } from "../resource-url";
 
 RegisterDxBmpTextureLoader();
 
+// MMD skydomes commonly extend to roughly 1,000 scene units.
+const SCENE_CAMERA_MAX_Z = 5_000;
+
 interface MmdMaterialState {
   material: MmdStandardMaterial;
   sphereTexture: MmdStandardMaterial["sphereTexture"];
@@ -82,6 +85,7 @@ export class SceneBuilder implements ISceneBuilder {
 
   private readonly modelPath: string;
   private readonly stagePath: string | null;
+  private readonly skyboxPath: string | null;
   private readonly motionPaths: string[];
   private readonly cameraPath: string | undefined;
   private readonly audioPath: string;
@@ -93,6 +97,7 @@ export class SceneBuilder implements ISceneBuilder {
   constructor({
     modelPath,
     stagePath,
+    skyboxPath,
     motionPath,
     audioPath,
     cameraPath,
@@ -103,6 +108,7 @@ export class SceneBuilder implements ISceneBuilder {
   }: {
     modelPath: string;
     stagePath: string | null;
+    skyboxPath: string | null;
     motionPath: string[];
     audioPath: string;
     cameraPath?: string;
@@ -113,6 +119,7 @@ export class SceneBuilder implements ISceneBuilder {
   }) {
     this.modelPath = modelPath;
     this.stagePath = stagePath;
+    this.skyboxPath = skyboxPath;
     this.motionPaths = motionPath;
     this.cameraPath = cameraPath;
     this.audioPath = audioPath;
@@ -176,7 +183,7 @@ export class SceneBuilder implements ISceneBuilder {
       new Vector3(0, 10, 0),
       this.scene,
     );
-    mmdCamera.maxZ = 300;
+    mmdCamera.maxZ = SCENE_CAMERA_MAX_Z;
     mmdCamera.minZ = 1;
     mmdCamera.parent = this.mmdRoot;
 
@@ -188,7 +195,7 @@ export class SceneBuilder implements ISceneBuilder {
       new Vector3(0, 10, 1),
       this.scene,
     );
-    arcRotateCamera.maxZ = 1000;
+    arcRotateCamera.maxZ = SCENE_CAMERA_MAX_Z;
     arcRotateCamera.minZ = 0.1;
     arcRotateCamera.setPosition(new Vector3(0, 10, -45));
     arcRotateCamera.attachControl(this.canvas, false);
@@ -289,7 +296,7 @@ export class SceneBuilder implements ISceneBuilder {
   }
 
   private async loadResources(): Promise<void> {
-    const [modelAnimation, cameraAnimation, modelMesh, stageMesh] =
+    const [modelAnimation, cameraAnimation, modelMesh, stageMesh, skyboxMesh] =
       await Promise.all([
         this.loadModelMotion(),
         this.loadCameraMotion(),
@@ -297,6 +304,9 @@ export class SceneBuilder implements ISceneBuilder {
         this.stagePath === null
           ? Promise.resolve(null)
           : this.loadMmdMesh(this.stagePath, "stage"),
+        this.skyboxPath === null
+          ? Promise.resolve(null)
+          : this.loadMmdMesh(this.skyboxPath, "skybox"),
       ]);
 
     await this.configureScene(
@@ -304,6 +314,7 @@ export class SceneBuilder implements ISceneBuilder {
       cameraAnimation,
       modelMesh,
       stageMesh,
+      skyboxMesh,
     );
   }
 
@@ -343,7 +354,7 @@ export class SceneBuilder implements ISceneBuilder {
 
   private async loadMmdMesh(
     path: string,
-    resourceName: "model" | "stage",
+    resourceName: "model" | "stage" | "skybox",
   ): Promise<MmdMesh> {
     const materialBuilder = new MmdStandardMaterialBuilder();
     materialBuilder.renderMethod = getMaterialRenderMethod(
@@ -424,6 +435,7 @@ export class SceneBuilder implements ISceneBuilder {
     cameraAnimation: MmdAnimation | null,
     modelMesh: MmdMesh,
     stageMesh: MmdMesh | null,
+    skyboxMesh: MmdMesh | null,
   ): Promise<void> {
     const mmdCamera = this.scene.getCameraByName("mmdCamera") as MmdCamera;
     const arcRotateCamera = this.scene.getCameraByName(
@@ -464,6 +476,15 @@ export class SceneBuilder implements ISceneBuilder {
       }
       this.shadowGenerator.addShadowCaster(stageMesh);
       this.ground?.setEnabled(false);
+    }
+
+    if (skyboxMesh !== null) {
+      skyboxMesh.parent = this.mmdRoot;
+      for (const mesh of skyboxMesh.metadata.meshes) {
+        mesh.receiveShadows = false;
+      }
+      // PMX skydomes are huge inward-facing meshes. They must not cast
+      // shadows or they would occlude the scene's directional light.
     }
 
     const mmdModel = this.mmdRuntime.createMmdModel(modelMesh);

@@ -6,9 +6,15 @@ import {
   createVirtualResourceUrl,
   registerPlayerResourceUrl,
 } from "@wallpaper/player/resource-url";
+import {
+  resolveArtifactEntrypoints,
+  type ArtifactEntrypoints,
+  type ResolvedArtifactEntrypoint,
+} from "@wallpaper/resource-schema";
 import type {
   ModelList,
   MotionList,
+  SkyboxList,
   StageList,
 } from "@wallpaper/player/types";
 import type { BundledPlayerResources } from "../app/types";
@@ -16,6 +22,7 @@ import type { BundledPlayerResources } from "../app/types";
 export interface MaterializedPlayerResources {
   models: ModelList[];
   motions: MotionList[];
+  skyboxes: SkyboxList[];
   stages: StageList[];
   dispose(): void;
 }
@@ -25,15 +32,24 @@ function normalizePath(path: string): string {
 }
 
 function entrypointValues(
-  entrypoints: Record<string, string | string[]>,
+  entrypoints: ArtifactEntrypoints,
   keys: string[],
 ): string[] {
-  for (const key of keys) {
-    const value = entrypoints[key];
-    if (typeof value === "string") return [normalizePath(value)];
-    if (Array.isArray(value)) return value.map(normalizePath);
-  }
-  return [];
+  return (
+    configuredEntrypointOptions(entrypoints, keys).find(
+      (entrypoint) => entrypoint.isDefault,
+    )?.paths ?? []
+  );
+}
+
+function configuredEntrypointOptions(
+  entrypoints: ArtifactEntrypoints,
+  keys: string[],
+): ResolvedArtifactEntrypoint[] {
+  return resolveArtifactEntrypoints(entrypoints, keys).map((entrypoint) => ({
+    ...entrypoint,
+    paths: entrypoint.paths.map(normalizePath),
+  }));
 }
 
 function inferPaths(
@@ -50,7 +66,7 @@ function inferPaths(
 }
 
 function resolvePaths(
-  entrypoints: Record<string, string | string[]>,
+  entrypoints: ArtifactEntrypoints,
   keys: string[],
   paths: string[],
   extensions: string[],
@@ -74,12 +90,59 @@ function resolvePaths(
   return resolved;
 }
 
+function resolveSelectableEntrypoints(
+  entrypoints: ArtifactEntrypoints,
+  keys: string[],
+  paths: string[],
+  extensions: string[],
+): ResolvedArtifactEntrypoint[] {
+  const configured = configuredEntrypointOptions(entrypoints, keys);
+  const resolved =
+    configured.length > 0
+      ? configured
+      : [
+          {
+            id: null,
+            name: null,
+            paths: inferPaths(paths, extensions),
+            isDefault: true,
+          },
+        ];
+  const available = new Set(paths);
+  for (const entrypoint of resolved) {
+    if (entrypoint.paths.length !== 1) {
+      throw new Error(
+        `${keys.join("/")} entrypoint ${entrypoint.id ?? "default"} must contain exactly one path.`,
+      );
+    }
+    const missing = entrypoint.paths.find((path) => !available.has(path));
+    if (missing !== undefined) {
+      throw new Error(`Artifact entrypoint does not exist: ${missing}`);
+    }
+  }
+  if (resolved[0]?.paths.length !== 1) {
+    throw new Error(
+      `Artifact has no compatible ${keys.join("/")} entrypoint.`,
+    );
+  }
+  return resolved;
+}
+
+function playerIdForEntrypoint(
+  id: string,
+  entrypoint: ResolvedArtifactEntrypoint,
+): string {
+  return entrypoint.isDefault || entrypoint.id === null
+    ? id
+    : `${id}:${entrypoint.id}`;
+}
+
 interface VersionFiles {
   versionId: string;
   sha256: string;
   paths: string[];
   virtualUrls: Map<string, string>;
-  entrypoints: Record<string, string | string[]>;
+  entrypoints: ArtifactEntrypoints;
 }
 
 function resolveVirtualUrl(
@@ -108,6 +171,7 @@ export async function materializeLibrary(
   const resources: MaterializedPlayerResources = {
     models: [...bundled.models],
     motions: [...bundled.motions],
+    skyboxes: [...bundled.skyboxes],
     stages: [...bundled.stages],
     dispose: () => undefined,
   };
@@ -203,18 +267,19 @@ export async function materializeLibrary(
 
     switch (resource.kind) {
       case "model": {
-        const [modelPath] = resolvePaths(
+        for (const entrypoint of resolveSelectableEntrypoints(
           files.entrypoints,
           ["model"],
           files.paths,
           [".pmx"],
-        ).map((path) => files.virtualUrls.get(path)!);
-        resources.models.push({
-          id,
-          name: resource.name,
-          modelPath,
-          remark: resource.description ?? undefined,
-        });
+        )) {
+          resources.models.push({
+            id: playerIdForEntrypoint(id, entrypoint),
+            name: entrypoint.name ?? resource.name,
+            modelPath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            remark: entrypoint.remark ?? resource.description ?? undefined,
+          });
+        }
         break;
       }
       case "motion": {
@@ -271,18 +336,35 @@ export async function materializeLibrary(
         break;
       }
       case "stage": {
-        const [stagePath] = resolvePaths(
+        for (const entrypoint of resolveSelectableEntrypoints(
           files.entrypoints,
           ["stage"],
           files.paths,
           [".pmx"],
-        ).map((path) => files.virtualUrls.get(path)!);
-        resources.stages.push({
-          id,
-          name: resource.name,
-          stagePath,
-          remark: resource.description ?? undefined,
-        });
+        )) {
+          resources.stages.push({
+            id: playerIdForEntrypoint(id, entrypoint),
+            name: entrypoint.name ?? resource.name,
+            stagePath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            remark: entrypoint.remark ?? resource.description ?? undefined,
+          });
+        }
+        break;
+      }
+      case "skybox": {
+        for (const entrypoint of resolveSelectableEntrypoints(
+          files.entrypoints,
+          ["skybox"],
+          files.paths,
+          [".pmx"],
+        )) {
+          resources.skyboxes.push({
+            id: playerIdForEntrypoint(id, entrypoint),
+            name: entrypoint.name ?? resource.name,
+            skyboxPath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            remark: entrypoint.remark ?? resource.description ?? undefined,
+          });
+        }
         break;
       }
     }
