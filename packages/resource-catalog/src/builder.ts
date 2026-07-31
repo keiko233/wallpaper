@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { createReadStream } from "node:fs";
 import {
   copyFile,
@@ -885,11 +886,21 @@ export async function publishFile(
   workingDirectory: string,
 ): Promise<void> {
   const { spawn } = await import("node:child_process");
+  const requireFromWorkingDirectory = createRequire(
+    resolve(workingDirectory, "package.json"),
+  );
+  const wranglerPackagePath = requireFromWorkingDirectory.resolve(
+    "wrangler/package.json",
+  );
+  const wranglerCliPath = resolve(
+    dirname(wranglerPackagePath),
+    "bin",
+    "wrangler.js",
+  );
   const child = spawn(
-    "pnpm",
+    process.execPath,
     [
-      "exec",
-      "wrangler",
+      wranglerCliPath,
       "r2",
       "object",
       "put",
