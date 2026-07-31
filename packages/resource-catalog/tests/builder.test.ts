@@ -18,6 +18,7 @@ import {
   buildWallpaperEngineBundle,
   loadManifests,
   resolveOutputRoot,
+  sourceFiles,
   validateArtifactFiles,
   validateDependencies,
   type LoadedSite,
@@ -188,6 +189,31 @@ describe("resource catalog builder", () => {
     expect(() =>
       resolveOutputRoot(loaded, "resource-manifests/output")
     ).toThrow(/must not overlap/u);
+  });
+
+  it("ignores Git metadata in manifest and resource directories", async () => {
+    const loaded = await makeSite();
+    await mkdir(resolve(loaded.manifestDir, ".git"), { recursive: true });
+    await writeFile(resolve(loaded.manifestDir, ".git/HEAD"), "ref: main");
+
+    const modelDirectory = resolve(loaded.manifestDir, "example-model");
+    await mkdir(resolve(modelDirectory, "files/.git"), { recursive: true });
+    await writeFile(resolve(modelDirectory, "files/.git/HEAD"), "ref: nested");
+
+    const manifests = await loadManifests(loaded);
+    expect(manifests).toHaveLength(5);
+
+    const model = manifests.find(
+      ({ definition }) => definition.id === "example-model",
+    );
+    const { root, files } = await sourceFiles(
+      model!.definition,
+      model!.directory,
+    );
+    expect(files.map((file) => file.slice(root.length + 1))).toEqual([
+      "model.pmx",
+      "textures/body.png",
+    ]);
   });
 
   it("validates dependency graphs at build time", async () => {

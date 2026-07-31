@@ -44,6 +44,7 @@ const IMMUTABLE_CACHE_CONTROL =
 const CATALOG_CACHE_CONTROL =
   "public, max-age=300, stale-while-revalidate=86400";
 export const ZIP_ENTRY_DATE = new Date("1980-01-01T00:00:00.000Z");
+const IGNORED_FILESYSTEM_ENTRIES = new Set([".DS_Store", ".git"]);
 
 export function stableJson(value: unknown): string {
   if (Array.isArray(value)) {
@@ -241,7 +242,7 @@ export async function listFiles(directory: string): Promise<string[]> {
   for (const entry of await readdir(directory, {
     withFileTypes: true,
   })) {
-    if (entry.name === ".DS_Store") continue;
+    if (IGNORED_FILESYSTEM_ENTRIES.has(entry.name)) continue;
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) {
       files.push(...(await listFiles(path)));
@@ -541,6 +542,7 @@ export async function loadManifests(
   const entries = await readdir(loaded.manifestDir, { withFileTypes: true });
   const manifests: LoadedManifest[] = [];
   for (const entry of entries) {
+    if (IGNORED_FILESYSTEM_ENTRIES.has(entry.name)) continue;
     if (!entry.isDirectory()) continue;
     const directory = resolve(loaded.manifestDir, entry.name);
     const manifestPath = resolve(directory, "manifest.json");
