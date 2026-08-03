@@ -84,6 +84,20 @@ export interface PlayerPersistence {
 
 export type MmdMaterialRenderMode = "mmd" | "balanced" | "performance";
 
+export type MmdQualityPreset = "performance" | "balanced" | "quality" | "ultra";
+
+export type ShadowFilteringMode = "pcf" | "pcss";
+
+export type SsrQualityLevel = "low" | "medium" | "high";
+
+/**
+ * Physics backend. "ammo" (Bullet via Ammo.js) reproduces the original
+ * MMD physics: PMX joint springs and per-body damping are honored, which
+ * is what video renders use. "havok" loads faster but drops those
+ * parameters and clamps small joint limits, which can cause clipping.
+ */
+export type MmdPhysicsBackend = "ammo" | "havok";
+
 export interface MmdRenderSettings {
   ambientLightIntensity: number;
   hemisphericLightIntensity: number;
@@ -108,7 +122,138 @@ export interface MmdRenderSettings {
   ignoreDiffuseWhenToonTextureIsNull: boolean;
   sphereTextureEnabled: boolean;
   toonTextureEnabled: boolean;
+  /** Quality preset that last applied the batch below; recomputed from values. */
+  qualityPreset: MmdQualityPreset;
+  /** MSAA samples used by the rendering pipeline (1, 2, 4 or 8). */
+  msaaSamples: number;
+  /** Shadow map resolution (1024, 2048 or 4096). */
+  shadowMapSize: number;
+  /** Shadow filter: PCF (cheap, crisp) or PCSS (soft penumbra, contact-like). */
+  shadowFiltering: ShadowFilteringMode;
+  /** Screen-space ambient occlusion. Changing requires a reload. */
+  ssaoEnabled: boolean;
+  /** SSAO sample radius in world units. */
+  ssaoRadius: number;
+  /** SSAO occlusion strength. */
+  ssaoStrength: number;
+  /** Screen-space reflections. Changing requires a reload. */
+  ssrEnabled: boolean;
+  /** SSR reflection strength. */
+  ssrStrength: number;
+  /** SSR ray-marching budget. */
+  ssrQuality: SsrQualityLevel;
+  /**
+   * MMD joint angular limit clamp in degrees. Lower values keep more of the
+   * model's original joint motion (softer hair/skirt physics) at the cost of
+   * constraint-solver stability. Changing requires a reload.
+   */
+  physicsConstraintLimitDegrees: number;
+  /** Back light that separates the model silhouette from the background. */
+  rimLightEnabled: boolean;
+  rimLightIntensity: number;
+  /** Physics engine: "ammo" is MMD-accurate, "havok" is lighter. */
+  physicsBackend: MmdPhysicsBackend;
 }
+
+/** Settings tuned by each quality preset. */
+export interface RenderQualityPresetSettings {
+  msaaSamples: number;
+  shadowMapSize: number;
+  shadowFiltering: ShadowFilteringMode;
+  ssaoEnabled: boolean;
+  ssaoRadius: number;
+  ssaoStrength: number;
+  ssrEnabled: boolean;
+  ssrStrength: number;
+  ssrQuality: SsrQualityLevel;
+  physicsConstraintLimitDegrees: number;
+  rimLightEnabled: boolean;
+  rimLightIntensity: number;
+  physicsBackend: MmdPhysicsBackend;
+}
+
+export const RENDER_QUALITY_PRESETS: Record<
+  MmdQualityPreset,
+  RenderQualityPresetSettings
+> = {
+  performance: {
+    msaaSamples: 1,
+    shadowMapSize: 1024,
+    shadowFiltering: "pcf",
+    ssaoEnabled: false,
+    ssaoRadius: 0.0006,
+    ssaoStrength: 0.8,
+    ssrEnabled: false,
+    ssrStrength: 0.7,
+    ssrQuality: "low",
+    physicsConstraintLimitDegrees: 15,
+    rimLightEnabled: false,
+    rimLightIntensity: 0.3,
+    physicsBackend: "havok",
+  },
+  balanced: {
+    msaaSamples: 2,
+    shadowMapSize: 1024,
+    shadowFiltering: "pcf",
+    ssaoEnabled: true,
+    ssaoRadius: 0.0008,
+    ssaoStrength: 0.9,
+    ssrEnabled: false,
+    ssrStrength: 0.7,
+    ssrQuality: "low",
+    physicsConstraintLimitDegrees: 10,
+    rimLightEnabled: false,
+    rimLightIntensity: 0.3,
+    physicsBackend: "ammo",
+  },
+  quality: {
+    msaaSamples: 4,
+    shadowMapSize: 2048,
+    shadowFiltering: "pcss",
+    ssaoEnabled: true,
+    ssaoRadius: 0.001,
+    ssaoStrength: 1,
+    ssrEnabled: false,
+    ssrStrength: 0.7,
+    ssrQuality: "medium",
+    physicsConstraintLimitDegrees: 5,
+    rimLightEnabled: true,
+    rimLightIntensity: 0.3,
+    physicsBackend: "ammo",
+  },
+  ultra: {
+    msaaSamples: 8,
+    shadowMapSize: 4096,
+    shadowFiltering: "pcss",
+    ssaoEnabled: true,
+    ssaoRadius: 0.0012,
+    ssaoStrength: 1.2,
+    ssrEnabled: true,
+    ssrStrength: 1,
+    ssrQuality: "high",
+    physicsConstraintLimitDegrees: 5,
+    rimLightEnabled: true,
+    rimLightIntensity: 0.4,
+    physicsBackend: "ammo",
+  },
+};
+
+export const RENDER_QUALITY_PRESET_KEYS: readonly (keyof RenderQualityPresetSettings)[] =
+  [
+    "msaaSamples",
+    "shadowMapSize",
+    "shadowFiltering",
+    "ssaoEnabled",
+    "ssaoRadius",
+    "ssaoStrength",
+    "ssrEnabled",
+    "ssrStrength",
+    "ssrQuality",
+    "physicsConstraintLimitDegrees",
+    "rimLightEnabled",
+    "rimLightIntensity",
+    "physicsBackend",
+  ];
 
 export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   ambientLightIntensity: 0.5,
@@ -134,4 +279,40 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   ignoreDiffuseWhenToonTextureIsNull: true,
   sphereTextureEnabled: true,
   toonTextureEnabled: true,
+  qualityPreset: "quality",
+  msaaSamples: 4,
+  shadowMapSize: 2048,
+  shadowFiltering: "pcss",
+  ssaoEnabled: true,
+  ssaoRadius: 0.001,
+  ssaoStrength: 1,
+  ssrEnabled: false,
+  ssrStrength: 0.7,
+  ssrQuality: "medium",
+  physicsConstraintLimitDegrees: 5,
+  rimLightEnabled: true,
+  rimLightIntensity: 0.3,
+  physicsBackend: "ammo",
 };
+
+/** Returns the preset whose tuned values match the given settings, or "custom". */
+export function getRenderQualityPreset(
+  settings: MmdRenderSettings,
+): MmdQualityPreset | "custom" {
+  for (const preset of RENDER_QUALITY_PRESET_KEYS) {
+    const presetValue = RENDER_QUALITY_PRESETS[settings.qualityPreset][preset];
+    if (settings[preset] !== presetValue) return "custom";
+  }
+  return settings.qualityPreset;
+}
+
+export function applyRenderQualityPreset(
+  settings: MmdRenderSettings,
+  preset: MmdQualityPreset,
+): MmdRenderSettings {
+  return {
+    ...settings,
+    ...RENDER_QUALITY_PRESETS[preset],
+    qualityPreset: preset,
+  };
+}

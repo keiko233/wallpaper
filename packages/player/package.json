@@ -17,6 +17,7 @@
     "@babylonjs/inspector": "^9.17.0",
     "@babylonjs/materials": "^9.17.0",
     "@wallpaper/ui": "workspace:*",
+    "ammojs-typed": "^1.0.6",
     "babylon-mmd": "^1.2.0",
     "lucide-react": "^1.25.0",
     "motion": "^12.42.2"

@@ -23,12 +23,16 @@ import {
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
   type MmdMaterialRenderMode,
+  type MmdPhysicsBackend,
   type MmdPlaylistItem,
+  type MmdQualityPreset,
   type MmdRenderSettings,
   type ModelList,
   type MotionList,
   type PlayerPersistence,
+  type ShadowFilteringMode,
   type SkyboxList,
+  type SsrQualityLevel,
   type StageList,
 } from "../types";
 import {
@@ -115,6 +119,28 @@ function normalizeMaterialRenderMode(
   return value === "balanced" || value === "performance" || value === "mmd"
     ? value
     : DEFAULT_MMD_RENDER_SETTINGS.materialRenderMode;
+}
+
+function normalizeQualityPreset(value: unknown): MmdQualityPreset {
+  return value === "performance" ||
+    value === "balanced" ||
+    value === "ultra"
+    ? value
+    : DEFAULT_MMD_RENDER_SETTINGS.qualityPreset;
+}
+
+function normalizeShadowFiltering(value: unknown): ShadowFilteringMode {
+  return value === "pcss" ? "pcss" : "pcf";
+}
+
+function normalizeSsrQuality(value: unknown): SsrQualityLevel {
+  return value === "low" || value === "high"
+    ? value
+    : DEFAULT_MMD_RENDER_SETTINGS.ssrQuality;
+}
+
+function normalizePhysicsBackend(value: unknown): MmdPhysicsBackend {
+  return value === "havok" ? "havok" : "ammo";
 }
 
 function normalizeRenderSettings(value: unknown): MmdRenderSettings {
@@ -230,6 +256,58 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       candidate.toonTextureEnabled,
       defaults.toonTextureEnabled,
     ),
+    qualityPreset: normalizeQualityPreset(candidate.qualityPreset),
+    msaaSamples: normalizeNumber(
+      candidate.msaaSamples,
+      defaults.msaaSamples,
+      1,
+      8,
+    ),
+    shadowMapSize: normalizeNumber(
+      candidate.shadowMapSize,
+      defaults.shadowMapSize,
+      1024,
+      4096,
+    ),
+    shadowFiltering: normalizeShadowFiltering(candidate.shadowFiltering),
+    ssaoEnabled: normalizeBoolean(candidate.ssaoEnabled, defaults.ssaoEnabled),
+    ssaoRadius: normalizeNumber(
+      candidate.ssaoRadius,
+      defaults.ssaoRadius,
+      0.0001,
+      0.01,
+    ),
+    ssaoStrength: normalizeNumber(
+      candidate.ssaoStrength,
+      defaults.ssaoStrength,
+      0,
+      2,
+    ),
+    ssrEnabled: normalizeBoolean(candidate.ssrEnabled, defaults.ssrEnabled),
+    ssrStrength: normalizeNumber(
+      candidate.ssrStrength,
+      defaults.ssrStrength,
+      0,
+      2,
+    ),
+    ssrQuality: normalizeSsrQuality(candidate.ssrQuality),
+    physicsConstraintLimitDegrees: normalizeNumber(
+      candidate.physicsConstraintLimitDegrees,
+      defaults.physicsConstraintLimitDegrees,
+      5,
+      30,
+    ),
+    rimLightEnabled: normalizeBoolean(
+      candidate.rimLightEnabled,
+      defaults.rimLightEnabled,
+    ),
+    rimLightIntensity: normalizeNumber(
+      candidate.rimLightIntensity,
+      defaults.rimLightIntensity,
+      0,
+      1,
+    ),
+    physicsBackend: normalizePhysicsBackend(candidate.physicsBackend),
   };
 }
 
@@ -1014,7 +1092,12 @@ export function MmdProvider({
       const next = normalizeRenderSettings({ ...current, ...settings });
       const requiresReload =
         next.materialRenderMode !== current.materialRenderMode ||
-        next.stageEffectsEnabled !== current.stageEffectsEnabled;
+        next.stageEffectsEnabled !== current.stageEffectsEnabled ||
+        next.ssaoEnabled !== current.ssaoEnabled ||
+        next.ssrEnabled !== current.ssrEnabled ||
+        next.physicsConstraintLimitDegrees !==
+          current.physicsConstraintLimitDegrees ||
+        next.physicsBackend !== current.physicsBackend;
 
       markPersistenceDirty();
       renderSettingsRef.current = next;

@@ -117,6 +117,9 @@ importers:
       '@wallpaper/ui':
         specifier: workspace:*
         version: link:../ui
+      ammojs-typed:
+        specifier: ^1.0.6
+        version: 1.0.6
       babylon-mmd:
         specifier: ^1.2.0
         version: 1.2.0(@babylonjs/core@9.17.0)
@@ -1757,6 +1760,9 @@ packages:
   '@zip.js/zip.js@2.8.34':
     resolution: {integrity: sha512-+6a3lyqq69rpseLbvDPiVIWsZ/HdTGAAD6afFtug6ECPDGttb2dHnPC6cJgdPofYkzL9OvXizegq+DQVfL2rnA==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
+
+  ammojs-typed@1.0.6:
+    resolution: {integrity: sha512-ut/tD0m5eEdlJ5KK97ma6SIEGZ4FN3AJTSVz8wl6C4EtnpVQdP70lOwgDMJKsHjTohxc2/xEZl6yJfMBZNlQ5w==}
 
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
@@ -4328,6 +4334,8 @@ snapshots:
       tinyrainbow: 3.1.1
 
   '@zip.js/zip.js@2.8.34': {}
+
+  ammojs-typed@1.0.6: {}
 
   assertion-error@2.0.1: {}
 

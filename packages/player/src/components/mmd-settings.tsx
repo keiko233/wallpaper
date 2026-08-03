@@ -29,12 +29,34 @@ import {
   SheetTitle,
 } from "@wallpaper/ui/sheet";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import {
+  applyRenderQualityPreset,
+  getRenderQualityPreset,
+  type MmdQualityPreset,
+} from "../types";
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const MATERIAL_RENDER_MODE_LABELS = {
   mmd: "MMD accurate",
   balanced: "Balanced",
   performance: "Performance",
+} as const;
+
+const QUALITY_PRESET_LABELS: Record<MmdQualityPreset | "custom", string> = {
+  performance: "Performance",
+  balanced: "Balanced",
+  quality: "High quality",
+  ultra: "Ultra",
+  custom: "Custom",
+};
+
+const MSAA_OPTIONS = [1, 2, 4, 8] as const;
+const SHADOW_MAP_OPTIONS = [1024, 2048, 4096] as const;
+const SSR_QUALITY_LABELS = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
 } as const;
 
 const STATUS_LABELS = {
@@ -93,6 +115,7 @@ function SettingSlider({
   max,
   step,
   onChange,
+  onValueCommitted,
   formatValue = (current) => current.toFixed(2),
 }: {
   label: string;
@@ -101,6 +124,7 @@ function SettingSlider({
   max: number;
   step: number;
   onChange: (value: number) => void;
+  onValueCommitted?: (value: number) => void;
   formatValue?: (value: number) => string;
 }) {
   return (
@@ -112,6 +136,11 @@ function SettingSlider({
         min={min}
         onValueChange={(nextValue) => {
           onChange(
+            typeof nextValue === "number" ? nextValue : nextValue[0],
+          );
+        }}
+        onValueCommitted={(nextValue) => {
+          onValueCommitted?.(
             typeof nextValue === "number" ? nextValue : nextValue[0],
           );
         }}
@@ -263,6 +292,15 @@ export function MmdSettings({
   } = useMmdActions();
 
   const colorValue = background.slice(0, 7);
+
+  // The physics limit commits only on release; committing per drag tick
+  // would trigger a scene reload for every step.
+  const [physicsLimitDraft, setPhysicsLimitDraft] = useState(
+    renderSettings.physicsConstraintLimitDegrees,
+  );
+  useEffect(() => {
+    setPhysicsLimitDraft(renderSettings.physicsConstraintLimitDegrees);
+  }, [renderSettings.physicsConstraintLimitDegrees]);
 
   return (
     <SheetPopup className="bg-popover/82 backdrop-blur-2xl">
@@ -730,6 +768,295 @@ export function MmdSettings({
               setRenderSettings({ toonTextureEnabled: checked })
             }
           />
+        </section>
+
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
+          <div>
+            <SettingHeading title="Render quality" />
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Presets balance visual fidelity against GPU cost. Advanced
+              options tune each effect individually.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Quality preset</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (
+                  nextValue !== null &&
+                  nextValue !== "custom" &&
+                  nextValue !==
+                    getRenderQualityPreset(renderSettings)
+                ) {
+                  setRenderSettings(
+                    applyRenderQualityPreset(
+                      renderSettings,
+                      nextValue as MmdQualityPreset,
+                    ),
+                  );
+                }
+              }}
+              value={getRenderQualityPreset(renderSettings)}
+            >
+              <SelectTrigger aria-label="Quality preset">
+                <SelectValue>
+                  {
+                    QUALITY_PRESET_LABELS[
+                      getRenderQualityPreset(renderSettings)
+                    ]
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(
+                  QUALITY_PRESET_LABELS,
+                ) as (MmdQualityPreset | "custom")[])
+                  .filter((preset) => preset !== "custom")
+                  .map((preset) => (
+                    <SelectItem key={preset} value={preset}>
+                      {QUALITY_PRESET_LABELS[preset]}
+                    </SelectItem>
+                  ))}
+                {getRenderQualityPreset(renderSettings) === "custom" && (
+                  <SelectItem disabled value="custom">
+                    Custom
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            {getRenderQualityPreset(renderSettings) === "custom" && (
+              <p className="text-xs text-muted-foreground">
+                Custom values are currently applied.
+              </p>
+            )}
+          </div>
+
+          <SettingSwitch
+            checked={renderSettings.rimLightEnabled}
+            description="Faint cool back light that separates the model from the background."
+            label="Rim light"
+            onCheckedChange={(checked) =>
+              setRenderSettings({ rimLightEnabled: checked })
+            }
+          />
+          {renderSettings.rimLightEnabled && (
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
+              <SettingSlider
+                label="Rim light intensity"
+                max={1}
+                min={0}
+                onChange={(value) =>
+                  setRenderSettings({ rimLightIntensity: value })
+                }
+                step={0.05}
+                value={renderSettings.rimLightIntensity}
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Antialiasing samples</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (nextValue !== null) {
+                  setRenderSettings({ msaaSamples: Number(nextValue) });
+                }
+              }}
+              value={String(renderSettings.msaaSamples)}
+            >
+              <SelectTrigger aria-label="Antialiasing samples">
+                <SelectValue>{renderSettings.msaaSamples}×</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {MSAA_OPTIONS.map((samples) => (
+                  <SelectItem key={samples} value={String(samples)}>
+                    {samples}×
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Shadow map</Label>
+              <Select
+                onValueChange={(nextValue) => {
+                  if (nextValue !== null) {
+                    setRenderSettings({ shadowMapSize: Number(nextValue) });
+                  }
+                }}
+                value={String(renderSettings.shadowMapSize)}
+              >
+                <SelectTrigger aria-label="Shadow map resolution">
+                  <SelectValue>
+                    {renderSettings.shadowMapSize >= 1024
+                      ? `${renderSettings.shadowMapSize / 1024}K`
+                      : renderSettings.shadowMapSize}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {SHADOW_MAP_OPTIONS.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size >= 1024 ? `${size / 1024}K` : size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Shadow softness</Label>
+              <Select
+                onValueChange={(nextValue) => {
+                  if (nextValue === "pcf" || nextValue === "pcss") {
+                    setRenderSettings({ shadowFiltering: nextValue });
+                  }
+                }}
+                value={renderSettings.shadowFiltering}
+              >
+                <SelectTrigger aria-label="Shadow filtering">
+                  <SelectValue>
+                    {renderSettings.shadowFiltering === "pcss"
+                      ? "Soft (PCSS)"
+                      : "Crisp (PCF)"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pcf">Crisp (PCF)</SelectItem>
+                  <SelectItem value="pcss">Soft (PCSS)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <SettingSwitch
+            checked={renderSettings.ssaoEnabled}
+            description="Darkens crevices between hair, clothes and body for depth."
+            label="Ambient occlusion (SSAO)"
+            onCheckedChange={(checked) =>
+              setRenderSettings({ ssaoEnabled: checked })
+            }
+          />
+          {renderSettings.ssaoEnabled && (
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
+              <SettingSlider
+                formatValue={(value) => value.toFixed(4)}
+                label="SSAO radius"
+                max={0.005}
+                min={0.0001}
+                onChange={(value) =>
+                  setRenderSettings({ ssaoRadius: value })
+                }
+                step={0.0001}
+                value={renderSettings.ssaoRadius}
+              />
+              <SettingSlider
+                label="SSAO strength"
+                max={2}
+                min={0}
+                onChange={(value) =>
+                  setRenderSettings({ ssaoStrength: value })
+                }
+                step={0.05}
+                value={renderSettings.ssaoStrength}
+              />
+            </div>
+          )}
+
+          <SettingSwitch
+            checked={renderSettings.ssrEnabled}
+            description="Screen-space reflections on glossy surfaces. Experimental with MMD toon materials; best on reflective stages."
+            label="Screen-space reflections (SSR)"
+            onCheckedChange={(checked) =>
+              setRenderSettings({ ssrEnabled: checked })
+            }
+          />
+          {renderSettings.ssrEnabled && (
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
+              <SettingSlider
+                label="SSR strength"
+                max={2}
+                min={0}
+                onChange={(value) =>
+                  setRenderSettings({ ssrStrength: value })
+                }
+                step={0.05}
+                value={renderSettings.ssrStrength}
+              />
+              <div className="space-y-2">
+                <Label>SSR quality</Label>
+                <Select
+                  onValueChange={(nextValue) => {
+                    if (nextValue === "low" || nextValue === "medium" || nextValue === "high") {
+                      setRenderSettings({ ssrQuality: nextValue });
+                    }
+                  }}
+                  value={renderSettings.ssrQuality}
+                >
+                  <SelectTrigger aria-label="SSR quality">
+                    <SelectValue>
+                      {SSR_QUALITY_LABELS[renderSettings.ssrQuality]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <SettingSlider
+            formatValue={(value) => `${Math.round(value)}°`}
+            label="Physics joint limit"
+            max={30}
+            min={5}
+            onChange={setPhysicsLimitDraft}
+            onValueCommitted={(value) =>
+              setRenderSettings({ physicsConstraintLimitDegrees: value })
+            }
+            step={1}
+            value={physicsLimitDraft}
+          />
+
+          <div className="space-y-2">
+            <Label>Physics engine</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (nextValue === "ammo" || nextValue === "havok") {
+                  setRenderSettings({ physicsBackend: nextValue });
+                }
+              }}
+              value={renderSettings.physicsBackend}
+            >
+              <SelectTrigger aria-label="Physics engine">
+                <SelectValue>
+                  {renderSettings.physicsBackend === "ammo"
+                    ? "Bullet (MMD accurate)"
+                    : "Havok (lighter)"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ammo">Bullet (MMD accurate)</SelectItem>
+                <SelectItem value="havok">Havok (lighter)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Bullet matches how MMD itself simulates skirts and hair, and
+              honors the model's joint springs. Havok loads faster but drops
+              those settings. Changing the engine reloads the current
+              resources.
+            </p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Lower joint limits keep the model's original hair and skirt
+            motion; higher values improve stability on broken joints.
+            Changing SSAO, SSR, physics or this value reloads the current
+            resources.
+          </p>
         </section>
           </TabsPanel>
         </Tabs>
