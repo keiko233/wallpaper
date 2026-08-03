@@ -21,6 +21,7 @@ dist-ssr
 # beside its manifest while excluding the large local files from Git.
 /resources
 /resource-manifests
+/.resource-publish-state.json
 
 # Editor directories and files
 .vscode/*

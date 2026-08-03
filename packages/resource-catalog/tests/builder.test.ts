@@ -17,7 +17,10 @@ import {
   buildRepository,
   buildWallpaperEngineBundle,
   loadManifests,
+  loadPublishState,
+  publishStateFilePath,
   resolveOutputRoot,
+  savePublishState,
   sourceFiles,
   validateArtifactFiles,
   validateDependencies,
@@ -244,6 +247,41 @@ afterEach(async () => {
 });
 
 describe("resource catalog builder", () => {
+  it("persists and reloads the publish state per bucket", async () => {
+    const loaded = await makeSite();
+    const statePath = publishStateFilePath(loaded.siteDir);
+
+    await expect(loadPublishState(statePath)).resolves.toEqual({});
+
+    await savePublishState(statePath, {
+      "wallpaper-assets": {
+        "objects/model/example-model/1.0.0/abc/example.zip": "abc",
+      },
+    });
+    await expect(loadPublishState(statePath)).resolves.toEqual({
+      "wallpaper-assets": {
+        "objects/model/example-model/1.0.0/abc/example.zip": "abc",
+      },
+    });
+
+    await expect(
+      savePublishState(statePath, { "wallpaper-assets": {} }),
+    ).resolves.toBeUndefined();
+    await expect(loadPublishState(statePath)).resolves.toEqual({
+      "wallpaper-assets": {},
+    });
+
+    await expect(
+      writeFile(statePath, JSON.stringify({ "wallpaper-assets": ["bad"] })),
+    ).resolves.toBeUndefined();
+    await expect(loadPublishState(statePath)).rejects.toThrow(/Invalid/u);
+
+    await expect(
+      writeFile(statePath, JSON.stringify("bad")),
+    ).resolves.toBeUndefined();
+    await expect(loadPublishState(statePath)).rejects.toThrow(/Invalid/u);
+  });
+
   it("resolves configured output relative to the site and rejects overlap", async () => {
     const loaded = await makeSite();
     expect(resolveOutputRoot(loaded, loaded.site.outputDirectory)).toBe(

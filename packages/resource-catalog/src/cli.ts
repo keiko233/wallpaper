@@ -16,10 +16,11 @@ export interface ParsedArgs {
   output: string | undefined;
   bucket: string | undefined;
   prefix: string | undefined;
+  force: boolean;
 }
 
 const USAGE =
-  "Usage: wallpaper-resource-catalog <validate|build|publish-r2|bundle-wallpaper-engine> [--config <path>] [--output <dir>]\n       publish-r2 options: [--bucket <name>] [--prefix <path>]";
+  "Usage: wallpaper-resource-catalog <validate|build|publish-r2|bundle-wallpaper-engine> [--config <path>] [--output <dir>]\n       publish-r2 options: [--bucket <name>] [--prefix <path>] [--force]";
 
 function optionValue(argv: string[], index: number, option: string): string {
   const value = argv[index + 1];
@@ -35,6 +36,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let output: string | undefined;
   let bucket: string | undefined;
   let prefix: string | undefined;
+  let force = false;
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === "--") {
@@ -51,6 +53,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === "--prefix" || arg === "-p") {
       prefix = optionValue(argv, index, arg);
       index++;
+    } else if (arg === "--force" || arg === "-f") {
+      force = true;
     } else if (!arg.startsWith("-")) {
       if (command !== undefined) {
         throw new Error(`Unexpected extra argument: ${arg}\n${USAGE}`);
@@ -63,12 +67,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
   if (command === undefined) {
     throw new Error(USAGE);
   }
-  if (command !== "publish-r2" && (bucket !== undefined || prefix !== undefined)) {
+  if (
+    command !== "publish-r2" &&
+    (bucket !== undefined || prefix !== undefined || force)
+  ) {
     throw new Error(
-      `Options --bucket and --prefix are only valid for publish-r2.\n${USAGE}`,
+      `Options --bucket, --prefix and --force are only valid for publish-r2.\n${USAGE}`,
     );
   }
-  return { command, config, output, bucket, prefix };
+  return { command, config, output, bucket, prefix, force };
 }
 
 async function run(
@@ -77,6 +84,7 @@ async function run(
   output: string | undefined,
   bucket: string | undefined,
   prefix: string | undefined,
+  force: boolean,
 ) {
   const loaded = await loadSite(resolve(configPath));
   const outputDir = output ?? loaded.site.outputDirectory;
@@ -92,7 +100,7 @@ async function run(
       break;
     }
     case "publish-r2": {
-      await publishR2(loaded, outputDir, { bucket, prefix });
+      await publishR2(loaded, outputDir, { bucket, prefix, force });
       break;
     }
     case "bundle-wallpaper-engine": {
@@ -107,8 +115,8 @@ async function run(
 
 export async function main(argv: string[]): Promise<void> {
   try {
-    const { command, config, output, bucket, prefix } = parseArgs(argv);
-    await run(command, config, output, bucket, prefix);
+    const { command, config, output, bucket, prefix, force } = parseArgs(argv);
+    await run(command, config, output, bucket, prefix, force);
   } catch (error) {
     console.error(
       error instanceof Error ? error.message : String(error),

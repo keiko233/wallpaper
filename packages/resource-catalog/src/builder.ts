@@ -1066,7 +1066,7 @@ export async function publishFile(
 export async function publishR2(
   loaded: LoadedSite,
   outputDir: string,
-  options?: { bucket?: string; prefix?: string },
+  options?: { bucket?: string; prefix?: string; force?: boolean },
 ): Promise<void> {
   const bucketName = resolveR2BucketName(
     options?.bucket,
@@ -1075,9 +1075,23 @@ export async function publishR2(
   const prefix = normalizeR2Prefix(options?.prefix);
   const outputRoot = resolveOutputRoot(loaded, outputDir);
   const { catalogPath } = await buildRepository(loaded, outputRoot);
+  const statePath = publishStateFilePath(loaded.siteDir);
+  const state = await loadPublishState(statePath);
+  const bucketState = (state[bucketName] ??= {});
+  const isUpToDate = (key: string, sha: string): boolean =>
+    !options?.force && bucketState[key] === sha;
+
   const files = await listFiles(resolve(outputRoot, "objects"));
+  let uploaded = 0;
+  let skipped = 0;
   for (const [index, file] of files.entries()) {
     const key = r2ObjectKey(prefix, normalizeRelativePath(outputRoot, file));
+    const sha = await sha256File(file);
+    if (isUpToDate(key, sha)) {
+      console.log(`[${index + 1}/${files.length}] Skipping ${key} (unchanged)`);
+      skipped++;
+      continue;
+    }
     console.log(`[${index + 1}/${files.length}] Uploading ${key}`);
     await publishFile(
       bucketName,
@@ -1086,17 +1100,88 @@ export async function publishR2(
       IMMUTABLE_CACHE_CONTROL,
       loaded.siteDir,
     );
+    bucketState[key] = sha;
+    await savePublishState(statePath, state);
+    uploaded++;
   }
   const catalogKey = r2ObjectKey(prefix, "catalog.json");
-  console.log(`Uploading ${catalogKey} last`);
-  await publishFile(
-    bucketName,
-    catalogKey,
-    catalogPath,
-    CATALOG_CACHE_CONTROL,
-    loaded.siteDir,
+  const catalogSha = await sha256File(catalogPath);
+  if (isUpToDate(catalogKey, catalogSha)) {
+    console.log(`Skipping ${catalogKey} (unchanged)`);
+    skipped++;
+  } else {
+    console.log(`Uploading ${catalogKey} last`);
+    await publishFile(
+      bucketName,
+      catalogKey,
+      catalogPath,
+      CATALOG_CACHE_CONTROL,
+      loaded.siteDir,
+    );
+    bucketState[catalogKey] = catalogSha;
+    await savePublishState(statePath, state);
+  }
+  console.log(
+    `Published catalog from ${outputRoot} (${uploaded} uploaded, ${skipped} skipped)`,
   );
-  console.log(`Published catalog from ${outputRoot}`);
+}
+
+export const PUBLISH_STATE_FILE_NAME = ".resource-publish-state.json";
+
+export function publishStateFilePath(siteDir: string): string {
+  return resolve(siteDir, PUBLISH_STATE_FILE_NAME);
+}
+
+export async function loadPublishState(
+  path: string,
+): Promise<Record<string, Record<string, string>>> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return {};
+    }
+    throw error;
+  }
+  const parsed: unknown = JSON.parse(raw);
+  if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed)
+  ) {
+    throw new Error(`Invalid publish state file: ${path}`);
+  }
+  const result: Record<string, Record<string, string>> = {};
+  for (const [bucket, keys] of Object.entries(parsed)) {
+    if (
+      keys === null ||
+      typeof keys !== "object" ||
+      Array.isArray(keys)
+    ) {
+      throw new Error(
+        `Invalid publish state for bucket ${bucket} in ${path}`,
+      );
+    }
+    const bucketState: Record<string, string> = {};
+    for (const [key, hash] of Object.entries(keys)) {
+      if (typeof hash !== "string" || hash.length === 0) {
+        throw new Error(
+          `Invalid publish state entry for ${key} in ${path}`,
+        );
+      }
+      bucketState[key] = hash;
+    }
+    result[bucket] = bucketState;
+  }
+  return result;
+}
+
+export async function savePublishState(
+  path: string,
+  state: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): Promise<void> {
+  await writeFile(path, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 export { IMMUTABLE_CACHE_CONTROL, CATALOG_CACHE_CONTROL };

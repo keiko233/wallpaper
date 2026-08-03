@@ -28,6 +28,27 @@ describe("resource catalog CLI arguments", () => {
     });
   });
 
+  it("parses the force flag", () => {
+    expect(
+      parseArgs([
+        "publish-r2",
+        "--bucket",
+        "wallpaper-assets",
+        "--prefix",
+        "repo",
+        "--force",
+      ]),
+    ).toMatchObject({
+      command: "publish-r2",
+      bucket: "wallpaper-assets",
+      prefix: "repo",
+      force: true,
+    });
+    expect(parseArgs(["publish-r2", "-f"])).toMatchObject({
+      force: true,
+    });
+  });
+
   it("rejects an option whose value is another option", () => {
     expect(() =>
       parseArgs(["publish-r2", "--bucket", "--prefix", "repo"]),
@@ -36,6 +57,9 @@ describe("resource catalog CLI arguments", () => {
 
   it("rejects R2 options for other commands", () => {
     expect(() => parseArgs(["build", "--bucket", "wallpaper-assets"])).toThrow(
+      /only valid for publish-r2/u,
+    );
+    expect(() => parseArgs(["build", "--force"])).toThrow(
       /only valid for publish-r2/u,
     );
   });
