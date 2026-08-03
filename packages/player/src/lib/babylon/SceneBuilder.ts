@@ -862,7 +862,6 @@ export class SceneBuilder implements ISceneBuilder {
     defaultPipeline.chromaticAberrationEnabled = true;
     defaultPipeline.chromaticAberration.aberrationAmount = 1;
     defaultPipeline.depthOfFieldBlurLevel = DepthOfFieldEffectBlurLevel.Low;
-    defaultPipeline.fxaaEnabled = true;
     defaultPipeline.imageProcessingEnabled = true;
 
     this.colorCurves = new ColorCurves();
@@ -896,6 +895,7 @@ export class SceneBuilder implements ISceneBuilder {
       const pipeline = this.defaultPipeline;
       const profileBloom = this.stageRenderProfile?.bloom;
       pipeline.samples = settings.msaaSamples;
+      pipeline.fxaaEnabled = settings.fxaaEnabled;
       pipeline.bloomEnabled = settings.bloomEnabled;
       if (profileBloom !== undefined && settings.stageEffectsEnabled) {
         pipeline.bloomWeight = Math.min(

@@ -271,6 +271,10 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       1,
       8,
     ),
+    fxaaEnabled: normalizeBoolean(
+      candidate.fxaaEnabled,
+      defaults.fxaaEnabled,
+    ),
     shadowMapSize: normalizeNumber(
       candidate.shadowMapSize,
       defaults.shadowMapSize,

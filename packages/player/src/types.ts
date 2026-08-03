@@ -126,6 +126,8 @@ export interface MmdRenderSettings {
   qualityPreset: MmdQualityPreset;
   /** MSAA samples used by the rendering pipeline (1, 2, 4 or 8). */
   msaaSamples: number;
+  /** Fast FXAA post-process applied on top of MSAA. */
+  fxaaEnabled: boolean;
   /** Shadow map resolution (1024, 2048 or 4096). */
   shadowMapSize: number;
   /** Shadow filter: PCF (cheap, crisp) or PCSS (soft penumbra, contact-like). */
@@ -312,6 +314,7 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   toonTextureEnabled: true,
   qualityPreset: "quality",
   msaaSamples: 4,
+  fxaaEnabled: true,
   shadowMapSize: 2048,
   shadowFiltering: "pcss",
   ssaoEnabled: true,

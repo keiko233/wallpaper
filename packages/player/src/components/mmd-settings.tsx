@@ -926,6 +926,15 @@ export function MmdSettings({
             </Select>
           </div>
 
+          <SettingSwitch
+            checked={renderSettings.fxaaEnabled}
+            description="Fast post-process filter that smooths remaining jagged edges after MSAA."
+            label="FXAA"
+            onCheckedChange={(checked) =>
+              setRenderSettings({ fxaaEnabled: checked })
+            }
+          />
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Shadow map</Label>
