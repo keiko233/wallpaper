@@ -1,4 +1,11 @@
-import { createContext, useContext, type SetStateAction } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useSyncExternalStore,
+  type SetStateAction,
+} from "react";
+import type { PerformanceSnapshot, PerformanceStats } from "../lib/performance-stats";
 import type {
   MmdPlaylistItem,
   MmdRenderSettings,
@@ -74,6 +81,53 @@ export interface MmdCanvasState {
 }
 
 export const MmdCanvasContext = createContext<MmdCanvasState | null>(null);
+
+export interface MmdPerformanceState {
+  activeSlot: number;
+  /**
+   * Bumped whenever a controller slot finishes loading a new scene and its
+   * stats sampler is replaced, so consumers can resubscribe.
+   */
+  statsRevision: number;
+  /** Whether the FPS overlay is shown over the wallpaper. */
+  overlayVisible: boolean;
+  setOverlayVisible: (visible: boolean) => void;
+  /** Resolves the frame-time sampler of a controller slot. */
+  getStats: (slot: number) => PerformanceStats | null;
+}
+
+export const MmdPerformanceContext =
+  createContext<MmdPerformanceState | null>(null);
+
+export function useMmdPerformance(): MmdPerformanceState {
+  const context = useContext(MmdPerformanceContext);
+  if (context === null) {
+    throw new Error("useMmdPerformance must be used within MmdProvider.");
+  }
+  return context;
+}
+
+/**
+ * Subscribes to the active controller's frame-time sampler and returns the
+ * latest snapshot. Re-subscribes automatically when the sampler is replaced
+ * (scene load / slot switch).
+ */
+export function useLivePerformanceSnapshot(): PerformanceSnapshot | null {
+  const { activeSlot, getStats } = useMmdPerformance();
+  const stats = getStats(activeSlot);
+  const subscribe = useCallback(
+    (listener: () => void): (() => void) => {
+      if (stats === null) return () => undefined;
+      return stats.subscribe(listener);
+    },
+    [stats],
+  );
+  const getSnapshot = useCallback(
+    (): PerformanceSnapshot | null => stats?.getSnapshot() ?? null,
+    [stats],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot);
+}
 
 export function useMmdState(): MmdState {
   const context = useContext(MmdStateContext);

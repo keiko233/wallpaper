@@ -15,6 +15,7 @@ import { cn } from "@wallpaper/ui/utils";
 import {
   MmdActionsContext,
   MmdCanvasContext,
+  MmdPerformanceContext,
   MmdStateContext,
   type MmdActions,
   type MmdState,
@@ -42,6 +43,9 @@ import {
   DEFAULT_STAGES,
 } from "../defaults";
 import { MmdController } from "../lib/babylon/MmdController";
+import { PerformanceOverlay } from "../components/performance-overlay";
+import { OVERLAY_VISIBLE_STORAGE_KEY } from "../lib/overlay-storage";
+import { useLocalStorage } from "react-use";
 
 const TRANSITION_COVER_DELAY_MS = 120;
 const PLAYBACK_START_DELAY_MS = 160;
@@ -656,6 +660,12 @@ export function MmdProvider({
   >([null, null]);
   const [activeSlot, setActiveSlot] = useState(0);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [statsRevision, setStatsRevision] = useState(0);
+  const [overlayVisibleStored, setOverlayVisible] = useLocalStorage(
+    OVERLAY_VISIBLE_STORAGE_KEY,
+    false,
+  );
+  const overlayVisible = overlayVisibleStored === true;
   const [status, setStatus] = useState<MmdStatus>("idle");
   const [error, setError] = useState<Error | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -791,6 +801,10 @@ export function MmdProvider({
         .then((loaded) => {
           if (loaded && loadingKeysRef.current[slot] === key) {
             slotKeysRef.current[slot] = key;
+            // A new stats sampler now exists for this slot; bump the revision
+            // so consumers resubscribe even when the active slot is unchanged
+            // (e.g. an in-place reload).
+            setStatsRevision((revision) => revision + 1);
           }
           return loaded;
         })
@@ -1247,11 +1261,25 @@ export function MmdProvider({
     () => ({ activeSlot, isTransitioning: status === "loading", setCanvas }),
     [activeSlot, status, setCanvas],
   );
+  const performanceState = useMemo(
+    () => ({
+      activeSlot,
+      statsRevision,
+      overlayVisible,
+      setOverlayVisible,
+      getStats: (slot: number) => controllers[slot].getStats() ?? null,
+    }),
+    [activeSlot, controllers, statsRevision, overlayVisible, setOverlayVisible],
+  );
 
   return (
     <MmdCanvasContext value={canvasState}>
       <MmdStateContext value={state}>
-        <MmdActionsContext value={actions}>{children}</MmdActionsContext>
+        <MmdActionsContext value={actions}>
+          <MmdPerformanceContext value={performanceState}>
+            {children}
+          </MmdPerformanceContext>
+        </MmdActionsContext>
       </MmdStateContext>
     </MmdCanvasContext>
   );
@@ -1298,6 +1326,7 @@ export function MmdCanvas({
         )}
         ref={setSecondCanvas}
       />
+      <PerformanceOverlay />
       <AnimatePresence>
         {isTransitioning && (
           <Motion.div

@@ -20,7 +20,9 @@
     "@wallpaper/ui": "workspace:*",
     "babylon-mmd": "^1.2.0",
     "lucide-react": "^1.25.0",
-    "motion": "^12.42.2"
+    "motion": "^12.42.2",
+    "react-use": "^17.6.1",
+    "uplot": "^1.6.32"
   },
   "peerDependencies": {
     "react": "^19.2.7",

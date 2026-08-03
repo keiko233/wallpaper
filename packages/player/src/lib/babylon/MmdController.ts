@@ -2,6 +2,7 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import type { Color4 } from "@babylonjs/core/Maths/math.color";
 import { BaseRuntime } from "./BaseRuntime";
 import { SceneBuilder } from "./SceneBuilder";
+import { PerformanceStats } from "../performance-stats";
 import type {
   MmdRenderSettings,
   StageRenderProfile,
@@ -26,6 +27,7 @@ export class MmdController {
   private engine: Engine | null = null;
   private runtime: BaseRuntime | null = null;
   private sceneBuilder: SceneBuilder | null = null;
+  private stats: PerformanceStats | null = null;
   private onEnded: (() => void) | null = null;
 
   public async load(
@@ -61,18 +63,24 @@ export class MmdController {
     this.sceneBuilder = sceneBuilder;
 
     try {
+      const stats = new PerformanceStats();
       const runtime = await BaseRuntime.Create({
         canvas,
         engine,
         sceneBuilder,
+        onFrame: (frameTimeMs, frameEngine) =>
+          stats.record(frameTimeMs, frameEngine),
+        onFrameReset: () => stats.reset(),
       });
 
       if (generation !== this.generation || this.engine !== engine) {
         runtime.dispose();
+        stats.dispose();
         return false;
       }
 
       this.runtime = runtime;
+      this.stats = stats;
       return true;
     } catch (error) {
       if (this.engine === engine) {
@@ -96,6 +104,11 @@ export class MmdController {
 
   public setOnEnded(callback: (() => void) | null): void {
     this.onEnded = callback;
+  }
+
+  /** Returns the frame-time sampler for the loaded scene, if any. */
+  public getStats(): PerformanceStats | null {
+    return this.stats;
   }
 
   public activate(): boolean {
@@ -162,5 +175,7 @@ export class MmdController {
     this.runtime = null;
     this.engine = null;
     this.sceneBuilder = null;
+    this.stats?.dispose();
+    this.stats = null;
   }
 }

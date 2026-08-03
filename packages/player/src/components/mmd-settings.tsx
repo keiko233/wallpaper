@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { Button } from "@wallpaper/ui/button";
+import { Kbd } from "@wallpaper/ui/kbd";
 import { Label } from "@wallpaper/ui/label";
 import {
   Select,
@@ -17,7 +18,12 @@ import {
   TabsTab,
 } from "@wallpaper/ui/tabs";
 import { cn } from "@wallpaper/ui/utils";
-import { useMmdActions, useMmdState } from "../providers/mmd-context";
+import {
+  useLivePerformanceSnapshot,
+  useMmdActions,
+  useMmdPerformance,
+  useMmdState,
+} from "../providers/mmd-context";
 import { GroupedSelectItems } from "./grouped-select-items";
 import { PlaylistEditor } from "./playlist-editor";
 import {
@@ -179,6 +185,40 @@ function SettingSwitch({
   );
 }
 
+function formatOverlayFps(value: number): string {
+  return value >= 100 ? value.toFixed(0) : value.toFixed(1);
+}
+
+function LivePerformanceReadout() {
+  const snapshot = useLivePerformanceSnapshot();
+
+  if (snapshot === null || snapshot.frameCount === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Waiting for the first rendered frames…
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 font-mono">
+      <div className="flex items-baseline justify-between">
+        <span className="text-lg font-bold leading-none tabular-nums text-[#7CFC00]">
+          {formatOverlayFps(snapshot.fps)} FPS
+        </span>
+        <span className="text-xs leading-none tabular-nums text-muted-foreground">
+          {snapshot.frameTimeMs.toFixed(1)} ms
+        </span>
+      </div>
+      <div className="flex justify-between text-[11px] leading-none tabular-nums text-muted-foreground">
+        <span>avg {formatOverlayFps(snapshot.averageFps)}</span>
+        <span>1% low {formatOverlayFps(snapshot.low1PercentFps)}</span>
+        <span>{snapshot.drawCalls} draws</span>
+      </div>
+    </div>
+  );
+}
+
 function ResourceSelector({
   label,
   value,
@@ -290,6 +330,7 @@ export function MmdSettings({
     setRenderSettings,
     resetRenderSettings,
   } = useMmdActions();
+  const { overlayVisible, setOverlayVisible } = useMmdPerformance();
 
   const colorValue = background.slice(0, 7);
 
@@ -1132,6 +1173,28 @@ export function MmdSettings({
             Changing SSAO, SSR, physics or this value reloads the current
             resources.
           </p>
+        </section>
+
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
+          <div>
+            <SettingHeading title="FPS overlay" />
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              RTSS-style frame time monitor over the wallpaper. Toggle it
+              anytime with the <Kbd>`</Kbd> key.
+            </p>
+          </div>
+          <SettingSwitch
+            checked={overlayVisible}
+            description="Shows FPS, frame time, 1% lows and GPU stats over the wallpaper."
+            label="Show performance overlay"
+            onCheckedChange={setOverlayVisible}
+          />
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground/80">
+              Live stats
+            </p>
+            <LivePerformanceReadout />
+          </div>
         </section>
           </TabsPanel>
         </Tabs>
