@@ -35,6 +35,30 @@ export interface StageRenderProfile {
       roughness: number;
     };
   }[];
+  environment?: {
+    texturePath: string;
+    intensity: number;
+    rotationY: number;
+  };
+  lighting?: {
+    hemispheric?: {
+      color: string;
+      groundColor: string;
+      intensityMultiplier: number;
+    };
+    directional?: {
+      direction: [number, number, number];
+      color: string;
+      intensityMultiplier: number;
+    };
+    pointLights?: {
+      name: string;
+      position: [number, number, number];
+      color: string;
+      intensity: number;
+      range: number;
+    }[];
+  };
   reflection?: {
     materialNames: string[];
     textureSize: number;

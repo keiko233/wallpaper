@@ -85,6 +85,54 @@ const stageMaterialNamesSchema = z
   .min(1)
   .max(32);
 
+const stageVec3Schema = z.tuple([z.number(), z.number(), z.number()]);
+
+const stageEnvironmentSchema = z
+  .object({
+    texturePath: RelativePathSchema,
+    intensity: z.number().min(0).max(5).default(1),
+    rotationY: z.number().min(-6.2832).max(6.2832).default(0),
+  })
+  .strict();
+
+const stageHemisphericLightingSchema = z
+  .object({
+    color: stageHexColorSchema.default("#FFFFFF"),
+    groundColor: stageHexColorSchema.default("#FFFFFF"),
+    intensityMultiplier: z.number().min(0).max(5).default(1),
+  })
+  .strict();
+
+const stageDirectionalLightingSchema = z
+  .object({
+    direction: stageVec3Schema.default([0.5, -1, 1]),
+    color: stageHexColorSchema.default("#FFFFFF"),
+    intensityMultiplier: z.number().min(0).max(5).default(1),
+  })
+  .strict();
+
+const stagePointLightSchema = z
+  .object({
+    name: z.string().trim().min(1).max(64),
+    position: stageVec3Schema,
+    color: stageHexColorSchema,
+    intensity: z.number().min(0).max(100),
+    range: z.number().min(0.1).max(1_000),
+  })
+  .strict();
+
+const stageLightingSchema = z
+  .object({
+    hemispheric: stageHemisphericLightingSchema.optional(),
+    directional: stageDirectionalLightingSchema.optional(),
+    pointLights: z
+      .array(stagePointLightSchema)
+      .min(1)
+      .max(8)
+      .optional(),
+  })
+  .strict();
+
 const stageMaterialPbrSchema = z
   .object({
     materialNames: stageMaterialNamesSchema,
@@ -141,6 +189,8 @@ export const StageRenderProfileSchema = z
       })
       .strict()
       .optional(),
+    environment: stageEnvironmentSchema.optional(),
+    lighting: stageLightingSchema.optional(),
   })
   .strict();
 

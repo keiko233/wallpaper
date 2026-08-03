@@ -27,11 +27,13 @@ import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
+import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import type { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
+import { CubeTexture } from "@babylonjs/core/Materials/Textures/cubeTexture";
 import { ShadowOnlyMaterial } from "@babylonjs/materials/shadowOnly";
 import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
@@ -123,6 +125,7 @@ export class SceneBuilder implements ISceneBuilder {
   private materialStates: MmdMaterialState[] = [];
   private stageRenderProfile: StageRenderProfile | null;
   private stageCloneIndex = 0;
+  private stagePointLights: PointLight[] = [];
   /** The backend that was actually enabled (ammo may fall back to havok). */
   private actualPhysicsBackend: MmdPhysicsBackend | null = null;
 
@@ -974,14 +977,42 @@ export class SceneBuilder implements ISceneBuilder {
     }
 
     if (this.hemisphericLight !== undefined) {
-      this.hemisphericLight.intensity = settings.hemisphericLightIntensity;
+      const profileHemispheric =
+        settings.stageEffectsEnabled
+          ? this.stageRenderProfile?.lighting?.hemispheric
+          : undefined;
+      this.hemisphericLight.intensity =
+        settings.hemisphericLightIntensity *
+        (profileHemispheric?.intensityMultiplier ?? 1);
+      this.hemisphericLight.diffuse = Color3.FromHexString(
+        profileHemispheric?.color ?? "#FFFFFF",
+      ).toLinearSpace();
+      this.hemisphericLight.groundColor = Color3.FromHexString(
+        profileHemispheric?.groundColor ?? "#FFFFFF",
+      ).toLinearSpace();
     }
 
     if (this.directionalLight !== undefined) {
-      this.directionalLight.intensity = settings.directionalLightIntensity;
-      this.directionalLight.diffuse.copyFrom(
-        Color3.FromHexString(settings.directionalLightColor).toLinearSpace(),
-      );
+      const profileDirectional =
+        settings.stageEffectsEnabled
+          ? this.stageRenderProfile?.lighting?.directional
+          : undefined;
+      this.directionalLight.intensity =
+        settings.directionalLightIntensity *
+        (profileDirectional?.intensityMultiplier ?? 1);
+      const baseColor = Color3.FromHexString(
+        settings.directionalLightColor,
+      ).toLinearSpace();
+      const tint = Color3.FromHexString(
+        profileDirectional?.color ?? "#FFFFFF",
+      ).toLinearSpace();
+      this.directionalLight.diffuse.copyFrom(baseColor.multiply(tint));
+      if (profileDirectional !== undefined) {
+        const direction = Vector3.FromArray(profileDirectional.direction);
+        if (direction.lengthSquared() > 0) {
+          this.directionalLight.direction = direction.normalize();
+        }
+      }
     }
 
     if (this.shadowOnlyMaterial !== undefined) {
@@ -1031,6 +1062,14 @@ export class SceneBuilder implements ISceneBuilder {
     // operate on the final material type (PBR or MMD standard).
     if (profile.materials !== undefined) {
       this.applyStageMaterials(profile.materials, stageMesh);
+    }
+
+    if (profile.environment !== undefined) {
+      this.applyStageEnvironment(profile.environment);
+    }
+
+    if (profile.lighting !== undefined) {
+      this.applyStageLighting(profile.lighting);
     }
 
     if (profile.reflection !== undefined) {
@@ -1243,6 +1282,48 @@ export class SceneBuilder implements ISceneBuilder {
         }
         glowLayer.addIncludedOnlyMesh(mesh);
       }
+    }
+  }
+
+  private applyStageEnvironment(
+    environment: NonNullable<StageRenderProfile["environment"]>,
+  ): void {
+    const textureUrl = this.resolveStageProfileUrl(environment.texturePath);
+    const environmentTexture = CubeTexture.CreateFromPrefilteredData(
+      textureUrl,
+      this.scene,
+    );
+    environmentTexture.level = environment.intensity;
+    environmentTexture.rotationY = environment.rotationY;
+    this.scene.environmentTexture = environmentTexture;
+  }
+
+  /**
+   * Resolves a profile path relative to the stage PMX's virtual resource URL
+   * so bundled stage assets (e.g. IBL prefiltered data) load through the same
+   * object-URL mapping the stage model itself uses.
+   */
+  private resolveStageProfileUrl(relativePath: string): string {
+    const stageUrl = new URL(this.stagePath ?? "", "https://wallpaper.invalid");
+    return resolvePlayerResourceUrl(
+      new URL(relativePath, stageUrl).pathname,
+    );
+  }
+
+  private applyStageLighting(
+    lighting: NonNullable<StageRenderProfile["lighting"]>,
+  ): void {
+    for (const light of lighting.pointLights ?? []) {
+      const pointLight = new PointLight(
+        light.name,
+        new Vector3(light.position[0], light.position[1], light.position[2]),
+        this.scene,
+      );
+      pointLight.diffuse = Color3.FromHexString(light.color).toLinearSpace();
+      pointLight.intensity = light.intensity;
+      pointLight.range = light.range;
+      pointLight.parent = this.mmdRoot;
+      this.stagePointLights.push(pointLight);
     }
   }
 }

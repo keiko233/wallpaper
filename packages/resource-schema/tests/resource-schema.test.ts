@@ -582,6 +582,169 @@ describe("resource schema", () => {
     ).toThrow();
   });
 
+  it("applies defaults to stage environment and lighting profiles", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        environment: {
+          texturePath: "env/sky.dds",
+        },
+        lighting: {
+          hemispheric: {},
+          directional: {},
+        },
+      },
+    });
+
+    expect(parsed.render?.environment).toEqual({
+      texturePath: "env/sky.dds",
+      intensity: 1,
+      rotationY: 0,
+    });
+    expect(parsed.render?.lighting).toEqual({
+      hemispheric: {
+        color: "#FFFFFF",
+        groundColor: "#FFFFFF",
+        intensityMultiplier: 1,
+      },
+      directional: {
+        direction: [0.5, -1, 1],
+        color: "#FFFFFF",
+        intensityMultiplier: 1,
+      },
+    });
+  });
+
+  it("applies point light values and rejects empty point light arrays", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        lighting: {
+          pointLights: [
+            {
+              name: "主灯",
+              position: [0, 12, -8],
+              color: "#FFFFFF",
+              intensity: 2,
+              range: 40,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(parsed.render?.lighting?.pointLights).toEqual([
+      {
+        name: "主灯",
+        position: [0, 12, -8],
+        color: "#FFFFFF",
+        intensity: 2,
+        range: 40,
+      },
+    ]);
+
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        kind: "stage",
+        render: { lighting: { pointLights: [] } },
+      }),
+    ).toThrow();
+  });
+
+  it("rejects invalid environment and lighting profile values", () => {
+    const stage = {
+      ...definition,
+      kind: "stage",
+    };
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { environment: { texturePath: "../env/sky.dds" } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { environment: { texturePath: "env/sky.dds", intensity: 6 } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          environment: { texturePath: "env/sky.dds", rotationY: 7 },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: { hemispheric: { color: "white" } },
+        },
+      }),
+    ).toThrow(/hex color/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            hemispheric: { intensityMultiplier: 6 },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            directional: { direction: [0, 1] },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            pointLights: [
+              {
+                name: "灯",
+                position: [0, 1, 2],
+                color: "#FFFFFF",
+                intensity: 200,
+                range: 10,
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            pointLights: [
+              {
+                name: "灯",
+                position: [0, 1, 2],
+                color: "#FFFFFF",
+                intensity: 1,
+                range: 0,
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow();
+  });
+
   it("rejects invalid stage render profile values", () => {
     const stage = {
       ...definition,
@@ -627,6 +790,183 @@ describe("resource schema", () => {
       ResourceManifestSchema.parse({
         ...stage,
         render: { reflection: { materialNames: [] } },
+      }),
+    ).toThrow();
+  });
+
+  it("applies defaults to stage environment profiles", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        environment: {
+          texturePath: "textures/env.dds",
+        },
+      },
+    });
+
+    expect(parsed.render?.environment).toEqual({
+      texturePath: "textures/env.dds",
+      intensity: 1,
+      rotationY: 0,
+    });
+  });
+
+  it("applies defaults to stage lighting profiles", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        lighting: {
+          hemispheric: {},
+          directional: {},
+        },
+      },
+    });
+
+    expect(parsed.render?.lighting).toEqual({
+      hemispheric: {
+        color: "#FFFFFF",
+        groundColor: "#FFFFFF",
+        intensityMultiplier: 1,
+      },
+      directional: {
+        direction: [0.5, -1, 1],
+        color: "#FFFFFF",
+        intensityMultiplier: 1,
+      },
+    });
+  });
+
+  it("validates stage point light entries", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        lighting: {
+          pointLights: [
+            {
+              name: "路灯",
+              position: [1, 2, 3],
+              color: "#FFCC66",
+              intensity: 4,
+              range: 50,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(parsed.render?.lighting?.pointLights).toEqual([
+      {
+        name: "路灯",
+        position: [1, 2, 3],
+        color: "#FFCC66",
+        intensity: 4,
+        range: 50,
+      },
+    ]);
+  });
+
+  it("rejects invalid stage environment and lighting values", () => {
+    const stage = {
+      ...definition,
+      kind: "stage",
+    };
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          environment: {
+            texturePath: "../outside.dds",
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          environment: {
+            texturePath: "env.dds",
+            intensity: 6,
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          environment: {
+            texturePath: "env.dds",
+            rotationY: 7,
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            hemispheric: { color: "white" },
+          },
+        },
+      }),
+    ).toThrow(/hex color/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            directional: { direction: [0, 0] },
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: { pointLights: [] },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            pointLights: [
+              {
+                name: "灯",
+                position: [0, 0, 0],
+                color: "#FFFFFF",
+                intensity: 101,
+                range: 0.5,
+              },
+            ],
+          },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          lighting: {
+            pointLights: [
+              {
+                name: "灯",
+                position: [0, 0, 0],
+                color: "#FFFFFF",
+                intensity: 1,
+                range: 0.05,
+              },
+            ],
+          },
+        },
       }),
     ).toThrow();
   });
