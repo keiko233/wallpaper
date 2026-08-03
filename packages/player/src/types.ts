@@ -128,6 +128,11 @@ export interface MmdRenderSettings {
   msaaSamples: number;
   /** Fast FXAA post-process applied on top of MSAA. */
   fxaaEnabled: boolean;
+  /**
+   * Render resolution multiplier (1, 1.5 or 2). Values above 1 supersample
+   * the whole frame for stronger edge smoothing at a GPU cost.
+   */
+  supersamplingScale: number;
   /** Shadow map resolution (1024, 2048 or 4096). */
   shadowMapSize: number;
   /** Shadow filter: PCF (cheap, crisp) or PCSS (soft penumbra, contact-like). */
@@ -315,6 +320,7 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   qualityPreset: "quality",
   msaaSamples: 4,
   fxaaEnabled: true,
+  supersamplingScale: 1,
   shadowMapSize: 2048,
   shadowFiltering: "pcss",
   ssaoEnabled: true,

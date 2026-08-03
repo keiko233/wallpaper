@@ -58,6 +58,7 @@ const QUALITY_PRESET_LABELS: Record<MmdQualityPreset | "custom", string> = {
 };
 
 const MSAA_OPTIONS = [1, 2, 4, 8] as const;
+const SUPERSAMPLING_OPTIONS = [1, 1.5, 2] as const;
 const SHADOW_MAP_OPTIONS = [1024, 2048, 4096] as const;
 const SSR_QUALITY_LABELS = {
   low: "Low",
@@ -934,6 +935,33 @@ export function MmdSettings({
               setRenderSettings({ fxaaEnabled: checked })
             }
           />
+
+          <div className="space-y-2">
+            <Label>Supersampling</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (nextValue !== null) {
+                  setRenderSettings({
+                    supersamplingScale: Number(nextValue),
+                  });
+                }
+              }}
+              value={String(renderSettings.supersamplingScale)}
+            >
+              <SelectTrigger aria-label="Supersampling">
+                <SelectValue>
+                  {renderSettings.supersamplingScale}×
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {SUPERSAMPLING_OPTIONS.map((scale) => (
+                  <SelectItem key={scale} value={String(scale)}>
+                    {scale}×
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

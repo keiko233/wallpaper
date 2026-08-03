@@ -275,6 +275,12 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       candidate.fxaaEnabled,
       defaults.fxaaEnabled,
     ),
+    supersamplingScale: normalizeNumber(
+      candidate.supersamplingScale,
+      defaults.supersamplingScale,
+      1,
+      2,
+    ),
     shadowMapSize: normalizeNumber(
       candidate.shadowMapSize,
       defaults.shadowMapSize,

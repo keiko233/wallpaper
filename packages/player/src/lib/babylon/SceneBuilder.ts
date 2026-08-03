@@ -986,6 +986,8 @@ export class SceneBuilder implements ISceneBuilder {
       this.shadowOnlyMaterial.alpha = settings.shadowOpacity;
     }
 
+    this.applySupersamplingScale();
+
     for (const state of this.materialStates) {
       const material = state.material;
       material.applyAmbientColorToDiffuse =
@@ -998,6 +1000,20 @@ export class SceneBuilder implements ISceneBuilder {
       material.toonTexture = settings.toonTextureEnabled
         ? state.toonTexture
         : null;
+    }
+  }
+
+  private applySupersamplingScale(): void {
+    const scale = this.renderSettings.supersamplingScale;
+    // The engine renders at canvasSize / hardwareScalingLevel and
+    // adaptToDeviceRatio already sets the level to 1 / devicePixelRatio,
+    // so a scale of s supersamples the whole frame by s× on any display.
+    const devicePixelRatio =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const targetLevel = 1 / (devicePixelRatio * scale);
+    const currentLevel = this.engine.getHardwareScalingLevel();
+    if (Math.abs(currentLevel - targetLevel) > 1e-6) {
+      this.engine.setHardwareScalingLevel(targetLevel);
     }
   }
 
