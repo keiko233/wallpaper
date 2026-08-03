@@ -8,3 +8,6 @@ allowBuilds:
 
 overrides:
   '@esbuild-kit/core-utils>esbuild': ^0.25.12
+
+patchedDependencies:
+  ammo.js@0.0.2: patches/ammo.js@0.0.2.patch

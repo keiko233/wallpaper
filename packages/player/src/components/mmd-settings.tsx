@@ -293,14 +293,21 @@ export function MmdSettings({
 
   const colorValue = background.slice(0, 7);
 
-  // The physics limit commits only on release; committing per drag tick
-  // would trigger a scene reload for every step.
+  // The physics limit and strength commit only on release; committing per
+  // drag tick would trigger a scene reload for every step.
   const [physicsLimitDraft, setPhysicsLimitDraft] = useState(
     renderSettings.physicsConstraintLimitDegrees,
   );
+  const [physicsStrengthDraft, setPhysicsStrengthDraft] = useState(
+    renderSettings.physicsStrength,
+  );
   useEffect(() => {
     setPhysicsLimitDraft(renderSettings.physicsConstraintLimitDegrees);
-  }, [renderSettings.physicsConstraintLimitDegrees]);
+    setPhysicsStrengthDraft(renderSettings.physicsStrength);
+  }, [
+    renderSettings.physicsConstraintLimitDegrees,
+    renderSettings.physicsStrength,
+  ]);
 
   return (
     <SheetPopup className="bg-popover/82 backdrop-blur-2xl">
@@ -1051,6 +1058,74 @@ export function MmdSettings({
               resources.
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label>Physics step rate</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (nextValue === "30" || nextValue === "60" || nextValue === "120") {
+                  setRenderSettings({ physicsStepRate: Number(nextValue) });
+                }
+              }}
+              value={String(renderSettings.physicsStepRate)}
+            >
+              <SelectTrigger aria-label="Physics step rate">
+                <SelectValue>{renderSettings.physicsStepRate} Hz</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 Hz</SelectItem>
+                <SelectItem value="60">60 Hz</SelectItem>
+                <SelectItem value="120">120 Hz</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Higher rates simulate hair and skirts more smoothly at a CPU
+              cost.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className={renderSettings.physicsBackend === "havok" ? "opacity-50" : undefined}>
+              <SettingSlider
+                label="Solver iterations"
+                max={30}
+                min={5}
+                onChange={(value) =>
+                  setRenderSettings({ physicsSolverIterations: value })
+                }
+                step={1}
+                value={renderSettings.physicsSolverIterations}
+              />
+            </div>
+            {renderSettings.physicsBackend === "havok" ? (
+              <p className="text-xs text-muted-foreground">
+                Only available with the Bullet engine.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                More iterations resolve clipping between hair, clothes and
+                skin more reliably.
+              </p>
+            )}
+          </div>
+
+          <SettingSlider
+            formatValue={(value) => `${value.toFixed(2)}×`}
+            label="Physics strength"
+            max={3}
+            min={0.5}
+            onChange={setPhysicsStrengthDraft}
+            onValueCommitted={(value) =>
+              setRenderSettings({ physicsStrength: value })
+            }
+            step={0.05}
+            value={physicsStrengthDraft}
+          />
+          <p className="text-xs text-muted-foreground">
+            Stiffness of the model's joints; below 1 makes hair and skirts
+            softer, above 1 stiffer. Changing this value reloads the current
+            resources.
+          </p>
           <p className="text-xs text-muted-foreground">
             Lower joint limits keep the model's original hair and skirt
             motion; higher values improve stability on broken joints.

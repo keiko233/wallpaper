@@ -7,6 +7,9 @@ settings:
 overrides:
   '@esbuild-kit/core-utils>esbuild': ^0.25.12
 
+patchedDependencies:
+  ammo.js@0.0.2: 3e760b51992473e8b1d26ec401857066ec0c1c4c94c101a6b60e318340278b71
+
 importers:
 
   .:
@@ -100,6 +103,22 @@ importers:
         specifier: workspace:*
         version: link:../../packages/resource-catalog
 
+  packages/ammo-wasm:
+    dependencies:
+      ammo.js:
+        specifier: github:kripken/ammo.js#0f92865b2f2cff3602ff2cf203101cde0edf2c37
+        version: https://codeload.github.com/kripken/ammo.js/tar.gz/0f92865b2f2cff3602ff2cf203101cde0edf2c37(patch_hash=3e760b51992473e8b1d26ec401857066ec0c1c4c94c101a6b60e318340278b71)
+      ammojs-typed:
+        specifier: ^1.0.6
+        version: 1.0.6
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.3
+        version: 24.13.3
+      vite:
+        specifier: ^8.1.1
+        version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)
+
   packages/player:
     dependencies:
       '@babylonjs/core':
@@ -114,12 +133,12 @@ importers:
       '@babylonjs/materials':
         specifier: ^9.17.0
         version: 9.17.0(@babylonjs/core@9.17.0)
+      '@wallpaper/ammo-wasm':
+        specifier: workspace:*
+        version: link:../ammo-wasm
       '@wallpaper/ui':
         specifier: workspace:*
         version: link:../ui
-      ammojs-typed:
-        specifier: ^1.0.6
-        version: 1.0.6
       babylon-mmd:
         specifier: ^1.2.0
         version: 1.2.0(@babylonjs/core@9.17.0)
@@ -1760,6 +1779,10 @@ packages:
   '@zip.js/zip.js@2.8.34':
     resolution: {integrity: sha512-+6a3lyqq69rpseLbvDPiVIWsZ/HdTGAAD6afFtug6ECPDGttb2dHnPC6cJgdPofYkzL9OvXizegq+DQVfL2rnA==}
     engines: {bun: '>=0.7.0', deno: '>=1.0.0', node: '>=18.0.0'}
+
+  ammo.js@https://codeload.github.com/kripken/ammo.js/tar.gz/0f92865b2f2cff3602ff2cf203101cde0edf2c37:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/kripken/ammo.js/tar.gz/0f92865b2f2cff3602ff2cf203101cde0edf2c37}
+    version: 0.0.2
 
   ammojs-typed@1.0.6:
     resolution: {integrity: sha512-ut/tD0m5eEdlJ5KK97ma6SIEGZ4FN3AJTSVz8wl6C4EtnpVQdP70lOwgDMJKsHjTohxc2/xEZl6yJfMBZNlQ5w==}
@@ -4334,6 +4357,8 @@ snapshots:
       tinyrainbow: 3.1.1
 
   '@zip.js/zip.js@2.8.34': {}
+
+  ammo.js@https://codeload.github.com/kripken/ammo.js/tar.gz/0f92865b2f2cff3602ff2cf203101cde0edf2c37(patch_hash=3e760b51992473e8b1d26ec401857066ec0c1c4c94c101a6b60e318340278b71): {}
 
   ammojs-typed@1.0.6: {}
 

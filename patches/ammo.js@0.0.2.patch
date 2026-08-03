@@ -1,0 +1,24 @@
+diff --git a/builds/ammo.wasm.js b/builds/ammo.wasm.js
+index c11e0aa6a9a189627309234911a03be7a263cf93..52ee92271288e74fe6180595bd7bf55681edda92 100644
+--- a/builds/ammo.wasm.js
++++ b/builds/ammo.wasm.js
+@@ -921,7 +921,7 @@ lG.prototype.CreateEllipsoid=function(a,c,d,e){var g=this.OB;a&&"object"===typeo
+ lG.prototype.CreateFromTriMesh=function(a,c,d,e,g){var n=this.OB;qE();a&&"object"===typeof a&&(a=a.OB);"object"==typeof c&&(c=uE(c));if("object"==typeof d&&"object"===typeof d){var z=rE(d,ta);sE(d,ta,z);d=z}e&&"object"===typeof e&&(e=e.OB);g&&"object"===typeof g&&(g=g.OB);return k(TD(n,a,c,d,e,g),Y)};
+ lG.prototype.CreateFromConvexHull=function(a,c,d,e){var g=this.OB;a&&"object"===typeof a&&(a=a.OB);c&&"object"===typeof c&&(c=c.OB);d&&"object"===typeof d&&(d=d.OB);e&&"object"===typeof e&&(e=e.OB);return k(UD(g,a,c,d,e),Y)};lG.prototype.__destroy__=function(){VD(this.OB)};
+ (function(){function a(){b.PHY_FLOAT=WD();b.PHY_DOUBLE=XD();b.PHY_INTEGER=YD();b.PHY_SHORT=ZD();b.PHY_FIXEDPOINT88=$D();b.PHY_UCHAR=aE();b.CONST_GIMPACT_COMPOUND_SHAPE=bE();b.CONST_GIMPACT_TRIMESH_SHAPE_PART=cE();b.CONST_GIMPACT_TRIMESH_SHAPE=dE();b.BT_CONSTRAINT_ERP=eE();b.BT_CONSTRAINT_STOP_ERP=fE();b.BT_CONSTRAINT_CFM=gE();b.BT_CONSTRAINT_STOP_CFM=hE()}Aa?a():ya.unshift(a)})();b.CONTACT_ADDED_CALLBACK_SIGNATURE="iiiiiiii";b.CONTACT_DESTROYED_CALLBACK_SIGNATURE="ii";
+-b.CONTACT_PROCESSED_CALLBACK_SIGNATURE="iiii";b.INTERNAL_TICK_CALLBACK_SIGNATURE="vif";this.Ammo=b;
++b.CONTACT_PROCESSED_CALLBACK_SIGNATURE="iiii";b.INTERNAL_TICK_CALLBACK_SIGNATURE="vif";globalThis.Ammo=b;
+ 
+ 
+   return Ammo.ready
+@@ -929,9 +929,7 @@ b.CONTACT_PROCESSED_CALLBACK_SIGNATURE="iiii";b.INTERNAL_TICK_CALLBACK_SIGNATURE
+ 
+ );
+ })();
+-if (typeof exports === 'object' && typeof module === 'object')
++if (typeof module === 'object' && module !== null && typeof module.exports === 'object')
+   module.exports = Ammo;
+ else if (typeof define === 'function' && define['amd'])
+   define([], function() { return Ammo; });
+-else if (typeof exports === 'object')
+-  exports["Ammo"] = Ammo;

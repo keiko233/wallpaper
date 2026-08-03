@@ -153,6 +153,19 @@ export interface MmdRenderSettings {
   rimLightIntensity: number;
   /** Physics engine: "ammo" is MMD-accurate, "havok" is lighter. */
   physicsBackend: MmdPhysicsBackend;
+  /**
+   * Bullet constraint solver iterations (5-30, ammo backend only). More
+   * iterations resolve interpenetration more reliably at a CPU cost.
+   */
+  physicsSolverIterations: number;
+  /** Physics simulation rate in Hz (30, 60 or 120). */
+  physicsStepRate: number;
+  /**
+   * Global multiplier for PMX joint spring stiffness (0.5-3). Values below
+   * 1 make hair and skirts softer and droopier; above 1 makes them stiffer.
+   * Changing requires a reload.
+   */
+  physicsStrength: number;
 }
 
 /** Settings tuned by each quality preset. */
@@ -170,6 +183,9 @@ export interface RenderQualityPresetSettings {
   rimLightEnabled: boolean;
   rimLightIntensity: number;
   physicsBackend: MmdPhysicsBackend;
+  physicsSolverIterations: number;
+  physicsStepRate: number;
+  physicsStrength: number;
 }
 
 export const RENDER_QUALITY_PRESETS: Record<
@@ -190,6 +206,9 @@ export const RENDER_QUALITY_PRESETS: Record<
     rimLightEnabled: false,
     rimLightIntensity: 0.3,
     physicsBackend: "havok",
+    physicsSolverIterations: 6,
+    physicsStepRate: 30,
+    physicsStrength: 1,
   },
   balanced: {
     msaaSamples: 2,
@@ -205,6 +224,9 @@ export const RENDER_QUALITY_PRESETS: Record<
     rimLightEnabled: false,
     rimLightIntensity: 0.3,
     physicsBackend: "ammo",
+    physicsSolverIterations: 10,
+    physicsStepRate: 60,
+    physicsStrength: 1,
   },
   quality: {
     msaaSamples: 4,
@@ -220,6 +242,9 @@ export const RENDER_QUALITY_PRESETS: Record<
     rimLightEnabled: true,
     rimLightIntensity: 0.3,
     physicsBackend: "ammo",
+    physicsSolverIterations: 12,
+    physicsStepRate: 60,
+    physicsStrength: 1,
   },
   ultra: {
     msaaSamples: 8,
@@ -235,6 +260,9 @@ export const RENDER_QUALITY_PRESETS: Record<
     rimLightEnabled: true,
     rimLightIntensity: 0.4,
     physicsBackend: "ammo",
+    physicsSolverIterations: 16,
+    physicsStepRate: 120,
+    physicsStrength: 1,
   },
 };
 
@@ -253,6 +281,9 @@ export const RENDER_QUALITY_PRESET_KEYS: readonly (keyof RenderQualityPresetSett
     "rimLightEnabled",
     "rimLightIntensity",
     "physicsBackend",
+    "physicsSolverIterations",
+    "physicsStepRate",
+    "physicsStrength",
   ];
 
 export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
@@ -293,6 +324,9 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   rimLightEnabled: true,
   rimLightIntensity: 0.3,
   physicsBackend: "ammo",
+  physicsSolverIterations: 12,
+  physicsStepRate: 60,
+  physicsStrength: 1,
 };
 
 /** Returns the preset whose tuned values match the given settings, or "custom". */

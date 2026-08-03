@@ -143,6 +143,10 @@ function normalizePhysicsBackend(value: unknown): MmdPhysicsBackend {
   return value === "havok" ? "havok" : "ammo";
 }
 
+function normalizePhysicsStepRate(value: unknown): number {
+  return value === 30 || value === 120 ? value : 60;
+}
+
 function normalizeRenderSettings(value: unknown): MmdRenderSettings {
   const candidate =
     typeof value === "object" && value !== null
@@ -308,6 +312,19 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       1,
     ),
     physicsBackend: normalizePhysicsBackend(candidate.physicsBackend),
+    physicsSolverIterations: normalizeNumber(
+      candidate.physicsSolverIterations,
+      defaults.physicsSolverIterations,
+      5,
+      30,
+    ),
+    physicsStepRate: normalizePhysicsStepRate(candidate.physicsStepRate),
+    physicsStrength: normalizeNumber(
+      candidate.physicsStrength,
+      defaults.physicsStrength,
+      0.5,
+      3,
+    ),
   };
 }
 
@@ -1097,7 +1114,8 @@ export function MmdProvider({
         next.ssrEnabled !== current.ssrEnabled ||
         next.physicsConstraintLimitDegrees !==
           current.physicsConstraintLimitDegrees ||
-        next.physicsBackend !== current.physicsBackend;
+        next.physicsBackend !== current.physicsBackend ||
+        next.physicsStrength !== current.physicsStrength;
 
       markPersistenceDirty();
       renderSettingsRef.current = next;

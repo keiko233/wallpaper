@@ -115,6 +115,8 @@ export class SceneBuilder implements ISceneBuilder {
   private ssaoPipeline?: SSAORenderingPipeline;
   private ssrPipeline?: SSRRenderingPipeline;
   private rimLight?: DirectionalLight;
+  private ammoPlugin?: MmdAmmoJSPlugin;
+  private havokPlugin?: HavokPlugin;
   private colorCurves?: ColorCurves;
   private materialStates: MmdMaterialState[] = [];
   private stageRenderProfile: StageRenderProfile | null;
@@ -487,9 +489,13 @@ export class SceneBuilder implements ISceneBuilder {
   private async loadAmmoPhysicsEngine(): Promise<boolean> {
     try {
       console.log("Loading ammo.js physics...");
-      const ammoModule = await import("ammojs-typed");
-      const ammo = await ammoModule.default();
-      const ammoPlugin = new MmdAmmoJSPlugin(true, ammo);
+      const { loadAmmo } = await import("@wallpaper/ammo-wasm");
+      const ammo = await loadAmmo();
+      const ammoPlugin = (this.ammoPlugin = new MmdAmmoJSPlugin(
+        true,
+        ammo,
+      ));
+      this.applyAmmoQualitySettings();
       const physicsEnabled = this.scene.enablePhysics(
         new Vector3(0, -98, 0),
         ammoPlugin,
@@ -506,9 +512,22 @@ export class SceneBuilder implements ISceneBuilder {
         "Ammo.js physics failed to load, falling back to Havok.",
         error,
       );
+      this.ammoPlugin = undefined;
       await this.loadHavokPhysicsEngine();
       return false;
     }
+  }
+
+  private applyAmmoQualitySettings(): void {
+    const ammoPlugin = this.ammoPlugin;
+    if (ammoPlugin === undefined) return;
+    const settings = this.renderSettings;
+    ammoPlugin.setFixedTimeStep(1 / settings.physicsStepRate);
+    // The old embind build exposes solver fields as plain properties rather
+    // than get_/set_ methods despite the TypeScript declarations.
+    const solverInfo = ammoPlugin.world.getSolverInfo();
+    (solverInfo as unknown as { m_numIterations: number }).m_numIterations =
+      settings.physicsSolverIterations;
   }
 
   private async loadHavokPhysicsEngine(): Promise<void> {
@@ -527,7 +546,11 @@ export class SceneBuilder implements ISceneBuilder {
     });
     console.log("Created havok instance");
 
-    const havokPlugin = new HavokPlugin(true, havokInstance);
+    const havokPlugin = (this.havokPlugin = new HavokPlugin(
+      true,
+      havokInstance,
+    ));
+    havokPlugin.setTimeStep(1 / this.renderSettings.physicsStepRate);
     const physicsEnabled = this.scene.enablePhysics(
       new Vector3(0, -98, 0),
       havokPlugin,
@@ -602,6 +625,31 @@ export class SceneBuilder implements ISceneBuilder {
       this.renderSettings.stageEffectsEnabled
     ) {
       this.applyStageRenderProfile(stageMesh, modelMesh, skyboxMesh);
+    }
+
+    const physicsStrength = this.renderSettings.physicsStrength;
+    if (physicsStrength !== 1) {
+      // Scale the PMX joint spring stiffness before the physics model is
+      // built. Both backends read these values during buildPhysics, so the
+      // strength applies to Bullet and Havok alike.
+      const joints = modelMesh.metadata.joints as unknown as {
+        springPosition: [number, number, number];
+        springRotation: [number, number, number];
+      }[];
+      for (const joint of joints) {
+        const position = joint.springPosition;
+        joint.springPosition = [
+          position[0] * physicsStrength,
+          position[1] * physicsStrength,
+          position[2] * physicsStrength,
+        ];
+        const rotation = joint.springRotation;
+        joint.springRotation = [
+          rotation[0] * physicsStrength,
+          rotation[1] * physicsStrength,
+          rotation[2] * physicsStrength,
+        ];
+      }
     }
 
     const mmdModel = this.mmdRuntime.createMmdModel(modelMesh);
@@ -915,6 +963,12 @@ export class SceneBuilder implements ISceneBuilder {
       this.rimLight.intensity = settings.rimLightEnabled
         ? settings.rimLightIntensity
         : 0;
+    }
+
+    if (this.ammoPlugin !== undefined) {
+      this.applyAmmoQualitySettings();
+    } else if (this.havokPlugin !== undefined) {
+      this.havokPlugin.setTimeStep(1 / settings.physicsStepRate);
     }
 
     if (this.hemisphericLight !== undefined) {
