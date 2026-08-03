@@ -221,4 +221,116 @@ describe("materializeLibrary", () => {
     database.close();
     cache.close();
   });
+
+  it("carries stage render profiles from remote and bundled resources", async () => {
+    const options = createDatabaseOptions();
+    const database = new WallpaperClientDatabase(
+      "materialize-render",
+      options,
+    );
+    const cache = new WallpaperCacheDatabase(
+      "materialize-render-cache",
+      options,
+    );
+    const now = "2026-07-31T00:00:00.000Z";
+    const sha = "c".repeat(64);
+    const render = {
+      reflection: {
+        materialNames: ["地板", "水纹"],
+        textureSize: 512,
+        strength: 0.5,
+        blurKernel: 12,
+        planeOffset: 0,
+      },
+    };
+
+    await database.resources.bulkPut([
+      {
+        id: "source:render-stage",
+        sourceId: "source",
+        sourceName: "Test",
+        upstreamId: "render-stage",
+        kind: "stage",
+        name: "Render stage",
+        description: null,
+        categories: [],
+        tags: [],
+        visibility: "public",
+        publishedVersionId: "source:render-stage@1.0.0",
+        currentVersion: "1.0.0",
+        coverUrl: null,
+        catalogRevision: "revision",
+        updatedAt: now,
+      },
+    ]);
+    await database.resourceVersions.bulkPut([
+      {
+        id: "source:render-stage@1.0.0",
+        sourceId: "source",
+        upstreamId: "render-stage",
+        upstreamVersion: "1.0.0",
+        resourceId: "source:render-stage",
+        artifactId: "source:render-stage@1.0.0",
+        format: "zip",
+        fileName: "render-stage.zip",
+        contentType: "application/zip",
+        sha256: sha,
+        byteSize: 1,
+        entrypoints: {
+          stage: "stage.pmx",
+        },
+        render,
+        publishedAt: now,
+      },
+    ]);
+    await database.libraryItems.bulkPut([
+      {
+        resourceId: "source:render-stage",
+        resourceVersionId: "source:render-stage@1.0.0",
+        sourceId: "source",
+        kind: "stage",
+        source: "remote",
+        addedAt: now,
+      },
+    ]);
+    await cache.artifactFiles.bulkPut([
+      {
+        sha256: sha,
+        path: "stage.pmx",
+        contentType: "application/octet-stream",
+        byteSize: 1,
+        lastAccessedAt: now,
+        blob: new Blob(["s"]),
+      },
+    ]);
+
+    const resources = await materializeLibrary(database, cache, {
+      models: [],
+      motions: [],
+      skyboxes: [],
+      stages: [
+        {
+          id: "builtin:stage:bundled",
+          name: "Bundled stage",
+          stagePath: "/resources/stages/bundled/stage.pmx",
+          render,
+        },
+      ],
+    });
+
+    expect(resources.stages).toEqual([
+      expect.objectContaining({
+        id: "builtin:stage:bundled",
+        render,
+      }),
+      expect.objectContaining({
+        id: "remote:source:render-stage",
+        render,
+      }),
+    ]);
+
+    resources.dispose();
+    database.close();
+    cache.close();
+  });
 });

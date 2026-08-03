@@ -2,7 +2,10 @@ import { Engine } from "@babylonjs/core/Engines/engine";
 import type { Color4 } from "@babylonjs/core/Maths/math.color";
 import { BaseRuntime } from "./BaseRuntime";
 import { SceneBuilder } from "./SceneBuilder";
-import type { MmdRenderSettings } from "../../types";
+import type {
+  MmdRenderSettings,
+  StageRenderProfile,
+} from "../../types";
 
 export interface MmdLoadOptions {
   modelPath: string;
@@ -14,6 +17,7 @@ export interface MmdLoadOptions {
   cameraDelaySeconds?: number;
   backgroundColor: Color4;
   renderSettings: MmdRenderSettings;
+  stageRenderProfile: StageRenderProfile | null;
 }
 
 /** Imperative boundary between React and the Babylon.js runtime. */

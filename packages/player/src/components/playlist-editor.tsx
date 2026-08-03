@@ -29,6 +29,7 @@ import {
 import { cn } from "@wallpaper/ui/utils";
 import { useMmdActions, useMmdState } from "../providers/mmd-context";
 import type { MmdPlaylistItem } from "../types";
+import { GroupedSelectItems } from "./grouped-select-items";
 
 function createPlaylistId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -159,11 +160,10 @@ export function PlaylistEditor() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {models.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={models}
+                      valueFor={(model) => model.id}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -209,11 +209,10 @@ export function PlaylistEditor() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage.id} value={stage.id}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={stages}
+                      valueFor={(stage) => stage.id}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -235,11 +234,10 @@ export function PlaylistEditor() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {skyboxes.map((skybox) => (
-                      <SelectItem key={skybox.id} value={skybox.id}>
-                        {skybox.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={skyboxes}
+                      valueFor={(skybox) => skybox.id}
+                    />
                   </SelectContent>
                 </Select>
 
@@ -302,11 +300,10 @@ export function PlaylistEditor() {
                     <SelectValue>{models[modelIndex].name}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {models.map((model, index) => (
-                      <SelectItem key={model.id} value={String(index)}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={models}
+                      valueFor={(_model, index) => String(index)}
+                    />
                   </SelectContent>
                 </Select>
               </div>
@@ -342,11 +339,10 @@ export function PlaylistEditor() {
                     <SelectValue>{stages[stageIndex].name}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {stages.map((stage, index) => (
-                      <SelectItem key={stage.id} value={String(index)}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={stages}
+                      valueFor={(_stage, index) => String(index)}
+                    />
                   </SelectContent>
                 </Select>
               </div>
@@ -362,11 +358,10 @@ export function PlaylistEditor() {
                     <SelectValue>{skyboxes[skyboxIndex].name}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {skyboxes.map((skybox, index) => (
-                      <SelectItem key={skybox.id} value={String(index)}>
-                        {skybox.name}
-                      </SelectItem>
-                    ))}
+                    <GroupedSelectItems
+                      items={skyboxes}
+                      valueFor={(_skybox, index) => String(index)}
+                    />
                   </SelectContent>
                 </Select>
               </div>

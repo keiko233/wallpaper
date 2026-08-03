@@ -75,6 +75,56 @@ export const ResourceDependencySchema = z
   })
   .strict();
 
+const stageHexColorSchema = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-f]{6}$/iu, "Expected a #RRGGBB hex color.");
+
+const stageMaterialNamesSchema = z
+  .array(z.string().trim().min(1).max(256))
+  .min(1)
+  .max(32);
+
+/**
+ * Optional native render profile carried by stage resources. The player uses
+ * it to approximate a stage author's intended look (reflective floors,
+ * emissive glow, bloom tuning) with Babylon-native effects.
+ */
+export const StageRenderProfileSchema = z
+  .object({
+    reflection: z
+      .object({
+        materialNames: stageMaterialNamesSchema,
+        textureSize: z.number().int().min(128).max(1_024).default(512),
+        strength: z.number().min(0).max(1).default(0.5),
+        blurKernel: z.number().int().min(0).max(64).default(12),
+        planeOffset: z.number().min(-5).max(5).default(0),
+      })
+      .strict()
+      .optional(),
+    emissive: z
+      .array(
+        z
+          .object({
+            materialNames: stageMaterialNamesSchema,
+            color: stageHexColorSchema,
+            intensity: z.number().min(0).max(5).default(1),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(8)
+      .optional(),
+    bloom: z
+      .object({
+        intensityMultiplier: z.number().min(0).max(5).default(1),
+        thresholdOffset: z.number().min(-1).max(1).default(0),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const LegacyEntrypointsSchema = z.record(
   z.string().trim().min(1).max(64),
   z.union([
@@ -217,7 +267,24 @@ const metadataShape = {
   compatibility: compatibilitySchema,
   visibility: ResourceVisibilitySchema.default("public"),
   dependencies: z.array(ResourceDependencySchema).max(50).default([]),
+  render: StageRenderProfileSchema.optional(),
 } as const;
+
+function validateStageRenderProfile(
+  value: {
+    kind: z.infer<typeof ResourceKindSchema>;
+    render?: z.infer<typeof StageRenderProfileSchema>;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (value.kind !== "stage" && value.render !== undefined) {
+    context.addIssue({
+      code: "custom",
+      message: "Stage render profiles are supported only for stage resources.",
+      path: ["render"],
+    });
+  }
+}
 
 function validateEntrypointVariantKinds(
   value: {
@@ -283,7 +350,8 @@ export const ResourceDefinitionSchema = z
       .strict(),
   })
   .strict()
-  .superRefine(validateEntrypointVariantKinds);
+  .superRefine(validateEntrypointVariantKinds)
+  .superRefine(validateStageRenderProfile);
 
 export const ResourceDefinitionsSchema = z
   .object({
@@ -337,7 +405,8 @@ export const CatalogResourceSchema = z
       .strict(),
   })
   .strict()
-  .superRefine(validateEntrypointVariantKinds);
+  .superRefine(validateEntrypointVariantKinds)
+  .superRefine(validateStageRenderProfile);
 
 function validateLegacyCatalogEntrypoints(
   value: { resources: readonly z.infer<typeof CatalogResourceSchema>[] },
@@ -510,6 +579,7 @@ export const WallpaperEngineBundleSchema = z
             .object({
               ...bundledResourceBaseShape,
               stagePath: bundledPublicPathSchema,
+              render: StageRenderProfileSchema.optional(),
             })
             .strict(),
         ),
@@ -835,6 +905,7 @@ export type ResourceManifest = z.infer<typeof ResourceManifestSchema>;
 export type ResourceSite = z.infer<typeof ResourceSiteSchema>;
 export type ResourceVisibility = z.infer<typeof ResourceVisibilitySchema>;
 export type ResourceDependency = z.infer<typeof ResourceDependencySchema>;
+export type StageRenderProfile = z.infer<typeof StageRenderProfileSchema>;
 export type WallpaperEngineBundle = z.infer<
   typeof WallpaperEngineBundleSchema
 >;

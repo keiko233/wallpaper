@@ -12,20 +12,51 @@ export interface ModelList {
   id: string;
   name: string;
   modelPath: string;
+  /** Display group (source resource) when the model has selectable variants. */
+  group?: string;
   remark?: string;
+}
+
+/**
+ * Runtime stage render profile. Structurally identical to the resource
+ * catalog's StageRenderProfileSchema; kept local to avoid widening the
+ * player's dependency ownership.
+ */
+export interface StageRenderProfile {
+  reflection?: {
+    materialNames: string[];
+    textureSize: number;
+    strength: number;
+    blurKernel: number;
+    planeOffset: number;
+  };
+  emissive?: {
+    materialNames: string[];
+    color: string;
+    intensity: number;
+  }[];
+  bloom?: {
+    intensityMultiplier: number;
+    thresholdOffset: number;
+  };
 }
 
 export interface StageList {
   id: string;
   name: string;
   stagePath: string | null;
+  /** Display group (source resource) when the stage has selectable variants. */
+  group?: string;
   remark?: string;
+  render?: StageRenderProfile;
 }
 
 export interface SkyboxList {
   id: string;
   name: string;
   skyboxPath: string | null;
+  /** Display group (source resource) when the skybox has selectable variants. */
+  group?: string;
   remark?: string;
 }
 
@@ -72,6 +103,7 @@ export interface MmdRenderSettings {
   toneMappingEnabled: boolean;
   colorSaturation: number;
   materialRenderMode: MmdMaterialRenderMode;
+  stageEffectsEnabled: boolean;
   applyAmbientColorToDiffuse: boolean;
   ignoreDiffuseWhenToonTextureIsNull: boolean;
   sphereTextureEnabled: boolean;
@@ -97,6 +129,7 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   toneMappingEnabled: true,
   colorSaturation: 8,
   materialRenderMode: "mmd",
+  stageEffectsEnabled: true,
   applyAmbientColorToDiffuse: true,
   ignoreDiffuseWhenToonTextureIsNull: true,
   sphereTextureEnabled: true,

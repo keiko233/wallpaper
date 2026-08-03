@@ -687,6 +687,9 @@ export async function buildRepository(
       compatibility: definition.compatibility,
       visibility: definition.visibility,
       dependencies: definition.dependencies,
+      ...(definition.render === undefined
+        ? {}
+        : { render: definition.render }),
       cover,
       artifact,
     });
@@ -943,6 +946,9 @@ export async function buildWallpaperEngineBundle(
             ...(entrypoint.remark === undefined
               ? {}
               : { remark: entrypoint.remark }),
+            ...(definition.render === undefined
+              ? {}
+              : { render: definition.render }),
             stagePath: bundledPath(
               definition,
               singleEntrypointPath(definition, entrypoint),

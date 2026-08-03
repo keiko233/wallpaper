@@ -601,6 +601,115 @@ describe("resource catalog builder", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("carries stage render profiles into the catalog and Wallpaper Engine bundle", async () => {
+    const loaded = await makeSite();
+    await loaded.writeResource(
+      "render-stage",
+      {
+        id: "render-stage",
+        version: "1.0.0",
+        kind: "stage",
+        name: "Render stage",
+        render: {
+          reflection: { materialNames: ["地板", "水纹"] },
+          emissive: [
+            {
+              materialNames: ["月亮"],
+              color: "#CFE8FF",
+              intensity: 1.2,
+            },
+          ],
+          bloom: { intensityMultiplier: 2.2, thresholdOffset: -0.12 },
+        },
+        artifact: {
+          fileName: "render-stage.zip",
+          format: "zip",
+          entrypoints: { stage: "stage.pmx" },
+        },
+      },
+      { "stage.pmx": "stage" },
+    );
+
+    await buildRepository(loaded, loaded.site.outputDirectory);
+    const catalog = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/catalog.json",
+        ),
+        "utf8",
+      ),
+    ) as {
+      resources: Array<{ id: string; render?: unknown }>;
+    };
+    expect(
+      catalog.resources.find(
+        (resource) => resource.id === "render-stage",
+      )?.render,
+    ).toEqual({
+      reflection: {
+        materialNames: ["地板", "水纹"],
+        textureSize: 512,
+        strength: 0.5,
+        blurKernel: 12,
+        planeOffset: 0,
+      },
+      emissive: [
+        {
+          materialNames: ["月亮"],
+          color: "#CFE8FF",
+          intensity: 1.2,
+        },
+      ],
+      bloom: { intensityMultiplier: 2.2, thresholdOffset: -0.12 },
+    });
+
+    await buildWallpaperEngineBundle(
+      loaded,
+      loaded.site.outputDirectory,
+    );
+    const bundle = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/wallpaper-engine.json",
+        ),
+        "utf8",
+      ),
+    ) as {
+      resources: { stages: Array<{ id: string; render?: unknown }> };
+    };
+    expect(
+      bundle.resources.stages.find(
+        (stage) => stage.id === "builtin:stage:render-stage",
+      )?.render,
+    ).toBeDefined();
+  });
+
+  it("rejects render profiles on non-stage manifests", async () => {
+    const loaded = await makeSite();
+    await loaded.writeResource(
+      "render-model",
+      {
+        id: "render-model",
+        version: "1.0.0",
+        kind: "model",
+        name: "Render model",
+        render: { reflection: { materialNames: ["地板"] } },
+        artifact: {
+          fileName: "render-model.zip",
+          format: "zip",
+          entrypoints: { model: "model.pmx" },
+        },
+      },
+      { "model.pmx": "model" },
+    );
+
+    await expect(
+      buildRepository(loaded, loaded.site.outputDirectory),
+    ).rejects.toThrow(/only for stage resources/u);
+  });
+
   it("rejects wallpaper-engine bundles with platform-incompatible dependencies", async () => {
     const loaded = await makeSite();
 

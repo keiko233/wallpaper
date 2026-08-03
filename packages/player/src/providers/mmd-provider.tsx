@@ -210,6 +210,10 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
     materialRenderMode: normalizeMaterialRenderMode(
       candidate.materialRenderMode,
     ),
+    stageEffectsEnabled: normalizeBoolean(
+      candidate.stageEffectsEnabled,
+      defaults.stageEffectsEnabled,
+    ),
     applyAmbientColorToDiffuse: normalizeBoolean(
       candidate.applyAmbientColorToDiffuse,
       defaults.applyAmbientColorToDiffuse,
@@ -354,7 +358,7 @@ function getResourceKey(
   const skybox = skyboxes.find(
     (candidate) => candidate.id === item.skyboxId,
   )!;
-  return `${item.id}|${model.modelPath}|${stage.stagePath ?? "solid-color"}|${skybox.skyboxPath ?? "no-skybox"}|${motion.audioPath}|${motion.cameraPath ?? "default-camera"}|${motion.motionPath.join("|")}|camera-delay-${motion.cameraDelaySeconds ?? 0}`;
+  return `${item.id}|${model.modelPath}|${stage.stagePath ?? "solid-color"}|${skybox.skyboxPath ?? "no-skybox"}|${motion.audioPath}|${motion.cameraPath ?? "default-camera"}|${motion.motionPath.join("|")}|camera-delay-${motion.cameraDelaySeconds ?? 0}|stage-render-${JSON.stringify(stage.render ?? null)}`;
 }
 
 export function MmdProvider({
@@ -687,6 +691,7 @@ export function MmdProvider({
           cameraDelaySeconds: targetMotion.cameraDelaySeconds,
           backgroundColor: Color4.FromHexString(backgroundRef.current),
           renderSettings: renderSettingsRef.current,
+          stageRenderProfile: targetStage.render ?? null,
         })
         .then((loaded) => {
           if (loaded && loadingKeysRef.current[slot] === key) {
@@ -1008,7 +1013,8 @@ export function MmdProvider({
       const current = renderSettingsRef.current;
       const next = normalizeRenderSettings({ ...current, ...settings });
       const requiresReload =
-        next.materialRenderMode !== current.materialRenderMode;
+        next.materialRenderMode !== current.materialRenderMode ||
+        next.stageEffectsEnabled !== current.stageEffectsEnabled;
 
       markPersistenceDirty();
       renderSettingsRef.current = next;

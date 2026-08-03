@@ -750,6 +750,9 @@ export class ResourceClient {
           sha256: download.sha256,
           byteSize: download.byteSize,
           entrypoints: download.entrypoints,
+          ...(summary.render === undefined
+            ? {}
+            : { render: summary.render }),
           publishedAt: now,
         });
         await this.database.libraryItems.put({

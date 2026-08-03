@@ -36,10 +36,15 @@ import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPi
 import { DepthOfFieldEffectBlurLevel } from "@babylonjs/core/PostProcesses/depthOfFieldEffect";
 import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
+import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
+import { MirrorTexture } from "@babylonjs/core/Materials/Textures/mirrorTexture";
+import { Plane } from "@babylonjs/core/Maths/math.plane";
+import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
   type MmdMaterialRenderMode,
   type MmdRenderSettings,
+  type StageRenderProfile,
 } from "../../types";
 import { resolvePlayerResourceUrl } from "../resource-url";
 
@@ -82,6 +87,8 @@ export class SceneBuilder implements ISceneBuilder {
   private defaultPipeline?: DefaultRenderingPipeline;
   private colorCurves?: ColorCurves;
   private materialStates: MmdMaterialState[] = [];
+  private stageRenderProfile: StageRenderProfile | null;
+  private stageCloneIndex = 0;
 
   private readonly modelPath: string;
   private readonly stagePath: string | null;
@@ -104,6 +111,7 @@ export class SceneBuilder implements ISceneBuilder {
     cameraDelaySeconds = 0,
     backgroundColor = new Color4(0.39, 0.69, 0.97, 1),
     renderSettings = DEFAULT_MMD_RENDER_SETTINGS,
+    stageRenderProfile = null,
     onEnded,
   }: {
     modelPath: string;
@@ -115,6 +123,7 @@ export class SceneBuilder implements ISceneBuilder {
     cameraDelaySeconds?: number;
     backgroundColor?: Color4;
     renderSettings?: MmdRenderSettings;
+    stageRenderProfile?: StageRenderProfile | null;
     onEnded?: () => void;
   }) {
     this.modelPath = modelPath;
@@ -126,6 +135,7 @@ export class SceneBuilder implements ISceneBuilder {
     this.cameraDelayFrames = cameraDelaySeconds * 30;
     this.backgroundColor = backgroundColor;
     this.renderSettings = { ...renderSettings };
+    this.stageRenderProfile = stageRenderProfile;
     this.onEnded = onEnded;
   }
 
@@ -487,6 +497,14 @@ export class SceneBuilder implements ISceneBuilder {
       // shadows or they would occlude the scene's directional light.
     }
 
+    if (
+      stageMesh !== null &&
+      this.stageRenderProfile !== null &&
+      this.renderSettings.stageEffectsEnabled
+    ) {
+      this.applyStageRenderProfile(stageMesh, modelMesh, skyboxMesh);
+    }
+
     const mmdModel = this.mmdRuntime.createMmdModel(modelMesh);
     const modelAnimationHandle = mmdModel.createRuntimeAnimation(modelAnimation);
     mmdModel.setRuntimeAnimation(modelAnimationHandle);
@@ -550,9 +568,21 @@ export class SceneBuilder implements ISceneBuilder {
 
     if (this.defaultPipeline !== undefined) {
       const pipeline = this.defaultPipeline;
+      const profileBloom = this.stageRenderProfile?.bloom;
       pipeline.bloomEnabled = settings.bloomEnabled;
-      pipeline.bloomWeight = settings.bloomIntensity;
-      pipeline.bloomThreshold = settings.bloomThreshold;
+      if (profileBloom !== undefined && settings.stageEffectsEnabled) {
+        pipeline.bloomWeight = Math.min(
+          1,
+          Math.max(0, settings.bloomIntensity * profileBloom.intensityMultiplier),
+        );
+        pipeline.bloomThreshold = Math.min(
+          1,
+          Math.max(0, settings.bloomThreshold + profileBloom.thresholdOffset),
+        );
+      } else {
+        pipeline.bloomWeight = settings.bloomIntensity;
+        pipeline.bloomThreshold = settings.bloomThreshold;
+      }
       pipeline.depthOfFieldEnabled = settings.depthOfFieldEnabled;
       pipeline.depthOfField.focusDistance =
         settings.depthOfFieldFocusDistance;
@@ -587,6 +617,151 @@ export class SceneBuilder implements ISceneBuilder {
       material.toonTexture = settings.toonTextureEnabled
         ? state.toonTexture
         : null;
+    }
+  }
+
+  private applyStageRenderProfile(
+    stageMesh: MmdMesh,
+    modelMesh: MmdMesh,
+    skyboxMesh: MmdMesh | null,
+  ): void {
+    const profile = this.stageRenderProfile;
+    if (profile === null) return;
+
+    if (profile.reflection !== undefined) {
+      this.applyStageReflection(
+        profile.reflection,
+        stageMesh,
+        modelMesh,
+        skyboxMesh,
+      );
+    }
+    if (profile.emissive !== undefined) {
+      this.applyStageEmissive(profile.emissive, stageMesh);
+    }
+  }
+
+  private findStageMeshes(
+    stageMesh: MmdMesh,
+    names: readonly string[],
+  ): Mesh[] {
+    const wanted = new Set(names.map((name) => name.trim()));
+    const matched: Mesh[] = [];
+    for (const mesh of stageMesh.metadata.meshes) {
+      const materialName = mesh.material?.name ?? "";
+      if (wanted.has(mesh.name.trim()) || wanted.has(materialName.trim())) {
+        matched.push(mesh);
+      }
+    }
+    return matched;
+  }
+
+  /**
+   * Clones a stage material so profile effects never mutate loader state.
+   * Cloned materials keep the MMD shader (reflection and emissive are part
+   * of the underlying standard shader) and remain toggleable per mesh.
+   */
+  private cloneStageMaterial(mesh: Mesh): MmdStandardMaterial | null {
+    const source = mesh.material;
+    if (!(source instanceof MmdStandardMaterial)) return null;
+
+    const clone = source.clone(
+      `${mesh.name}_stageRender_${this.stageCloneIndex++}`,
+      true,
+    );
+    mesh.material = clone;
+    this.materialStates.push({
+      material: clone,
+      sphereTexture: clone.sphereTexture,
+      toonTexture: clone.toonTexture,
+    });
+    return clone;
+  }
+
+  private applyStageReflection(
+    reflection: NonNullable<StageRenderProfile["reflection"]>,
+    stageMesh: MmdMesh,
+    modelMesh: MmdMesh,
+    skyboxMesh: MmdMesh | null,
+  ): void {
+    const targets = this.findStageMeshes(
+      stageMesh,
+      reflection.materialNames,
+    );
+    if (targets.length === 0) return;
+
+    let planeY = -Infinity;
+    for (const mesh of targets) {
+      const maximumY = mesh.getHierarchyBoundingVectors(true).max.y;
+      if (maximumY > planeY) planeY = maximumY;
+    }
+    planeY += reflection.planeOffset;
+
+    const mirror = new MirrorTexture(
+      "stageRenderMirror",
+      reflection.textureSize,
+      this.scene,
+      false,
+    );
+    mirror.mirrorPlane = Plane.FromPositionAndNormal(
+      new Vector3(0, planeY, 0),
+      new Vector3(0, 1, 0),
+    );
+    // The standard shader scales planar reflections by the texture level.
+    mirror.level = reflection.strength;
+    mirror.blurKernel = reflection.blurKernel;
+    // Reflect the model, the rest of the stage, and the skybox; the
+    // reflection-target meshes are excluded so the mirror never recurses.
+    mirror.renderList = [
+      ...modelMesh.metadata.meshes,
+      ...stageMesh.metadata.meshes.filter(
+        (mesh) => !targets.includes(mesh),
+      ),
+      ...(skyboxMesh === null ? [] : skyboxMesh.metadata.meshes),
+    ];
+
+    for (const mesh of targets) {
+      const clone = this.cloneStageMaterial(mesh);
+      if (clone === null) continue;
+      clone.reflectionTexture = mirror;
+      // Textureless reflectors are water sheets; make them translucent so
+      // they read as a wet film over the floor below.
+      if (clone.diffuseTexture === null) {
+        clone.alpha = reflection.strength;
+      }
+    }
+  }
+
+  private applyStageEmissive(
+    groups: NonNullable<StageRenderProfile["emissive"]>,
+    stageMesh: MmdMesh,
+  ): void {
+    const glowLayer = new GlowLayer("stageRenderGlow", this.scene, {
+      mainTextureSamples: 2,
+    });
+    // An empty inclusion list means "all meshes" by default. Profiles use
+    // explicit material names, so exclude everything unless it matches.
+    glowLayer.setExcludedByDefault(true);
+
+    for (const group of groups) {
+      // StandardMaterial has no emissive intensity in 9.17; scale the color
+      // instead. The MMD shader clamps the added emissive so the visible
+      // surface cannot blow out to pure white.
+      const color = Color3.FromHexString(group.color).scale(group.intensity);
+      for (const mesh of this.findStageMeshes(
+        stageMesh,
+        group.materialNames,
+      )) {
+        const clone = this.cloneStageMaterial(mesh);
+        if (clone === null) continue;
+        clone.emissiveColor = color;
+        // Reuse the diffuse texture as an emissive mask so bright areas of
+        // the texture (moon, lamps) drive where the glow appears.
+        if (clone.diffuseTexture !== null) {
+          clone.emissiveTexture = clone.diffuseTexture;
+        }
+        glowLayer.addIncludedOnlyMesh(mesh);
+      }
     }
   }
 }

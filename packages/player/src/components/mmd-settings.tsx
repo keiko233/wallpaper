@@ -18,6 +18,7 @@ import {
 } from "@wallpaper/ui/tabs";
 import { cn } from "@wallpaper/ui/utils";
 import { useMmdActions, useMmdState } from "../providers/mmd-context";
+import { GroupedSelectItems } from "./grouped-select-items";
 import { PlaylistEditor } from "./playlist-editor";
 import {
   SheetDescription,
@@ -159,7 +160,7 @@ function ResourceSelector({
 }: {
   label: string;
   value: number;
-  items: readonly { name: string }[];
+  items: readonly { id: string; name: string; group?: string }[];
   onChange: (index: number) => void;
   onPrevious: () => void;
   onNext: () => void;
@@ -190,11 +191,10 @@ function ResourceSelector({
             <SelectValue>{items[value].name}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {items.map((item, index) => (
-              <SelectItem key={`${item.name}-${index}`} value={String(index)}>
-                {item.name}
-              </SelectItem>
-            ))}
+            <GroupedSelectItems
+              items={items}
+              valueFor={(_item, index) => String(index)}
+            />
           </SelectContent>
         </Select>
 
@@ -531,6 +531,18 @@ export function MmdSettings({
               Reset
             </Button>
           </div>
+
+          <SettingSwitch
+            checked={renderSettings.stageEffectsEnabled}
+            description="Applies the stage's built-in look: reflective floor, emissive glow, and bloom tuning."
+            label="Stage effects"
+            onCheckedChange={(checked) =>
+              setRenderSettings({ stageEffectsEnabled: checked })
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            Changing this option reloads the current resources.
+          </p>
 
           <SettingSwitch
             checked={renderSettings.bloomEnabled}

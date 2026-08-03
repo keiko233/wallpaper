@@ -357,6 +357,190 @@ describe("resource schema", () => {
     ).toHaveLength(2);
   });
 
+  it("validates stage render profiles and applies their defaults", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        reflection: {
+          materialNames: ["地板", "水纹"],
+        },
+        emissive: [
+          {
+            materialNames: ["月亮"],
+            color: "#CFE8FF",
+          },
+        ],
+        bloom: {
+          intensityMultiplier: 2.2,
+          thresholdOffset: -0.12,
+        },
+      },
+    });
+
+    expect(parsed.render).toEqual({
+      reflection: {
+        materialNames: ["地板", "水纹"],
+        textureSize: 512,
+        strength: 0.5,
+        blurKernel: 12,
+        planeOffset: 0,
+      },
+      emissive: [
+        {
+          materialNames: ["月亮"],
+          color: "#CFE8FF",
+          intensity: 1,
+        },
+      ],
+      bloom: {
+        intensityMultiplier: 2.2,
+        thresholdOffset: -0.12,
+      },
+    });
+  });
+
+  it("rejects render profiles on non-stage resources", () => {
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        render: {
+          emissive: [{ materialNames: ["月亮"], color: "#FFFFFF" }],
+        },
+      }),
+    ).toThrow(/only for stage resources/u);
+  });
+
+  it("rejects invalid stage render profile values", () => {
+    const stage = {
+      ...definition,
+      kind: "stage",
+    };
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          reflection: { materialNames: ["地板"], textureSize: 2048 },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          reflection: { materialNames: ["地板"], blurKernel: 65 },
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          emissive: [
+            { materialNames: ["月亮"], color: "white", intensity: 1 },
+          ],
+        },
+      }),
+    ).toThrow(/hex color/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          emissive: [
+            { materialNames: ["月亮"], color: "#FFFFFF", intensity: 6 },
+          ],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { reflection: { materialNames: [] } },
+      }),
+    ).toThrow();
+  });
+
+  it("accepts render profiles in catalogs only for stage resources", () => {
+    const resource = {
+      ...definition,
+      kind: "stage",
+      authors: [],
+      license: null,
+      categories: [],
+      tags: ["miku"],
+      compatibility: {
+        platforms: ["web", "wallpaper-engine"],
+        features: [],
+      },
+      visibility: "public",
+      dependencies: [],
+      cover: null,
+      render: { reflection: { materialNames: ["地板"] } },
+      artifact: {
+        path: "objects/stage/example-stage.zip",
+        fileName: "example-stage.zip",
+        format: "zip",
+        contentType: "application/zip",
+        byteSize: 123,
+        sha256: "b".repeat(64),
+        entrypoints: { stage: "stage.pmx" },
+      },
+    };
+    const catalog = {
+      schemaVersion: 3,
+      repository: { name: "Example" },
+      revision: "c".repeat(64),
+      resources: [resource],
+    };
+
+    expect(ResourceCatalogV3Schema.parse(catalog)).toBeDefined();
+    expect(() =>
+      ResourceCatalogV3Schema.parse({
+        ...catalog,
+        resources: [
+          {
+            ...resource,
+            kind: "model",
+            artifact: {
+              ...resource.artifact,
+              entrypoints: { model: "model.pmx" },
+            },
+          },
+        ],
+      }),
+    ).toThrow(/only for stage resources/u);
+  });
+
+  it("carries stage render profiles through the Wallpaper Engine bundle schema", () => {
+    const parsed = WallpaperEngineBundleSchema.parse({
+      schemaVersion: 1,
+      resources: {
+        audios: [],
+        models: [],
+        motions: [],
+        skyboxes: [],
+        stages: [
+          {
+            id: "builtin:stage:example-stage",
+            name: "Example stage",
+            stagePath: "/resources/stages/example-stage/stage.pmx",
+            render: {
+              reflection: { materialNames: ["地板"] },
+            },
+          },
+        ],
+      },
+    });
+
+    expect(parsed.resources.stages[0]?.render?.reflection).toEqual({
+      materialNames: ["地板"],
+      textureSize: 512,
+      strength: 0.5,
+      blurKernel: 12,
+      planeOffset: 0,
+    });
+  });
+
   it("rejects ambiguous or unsupported selectable entrypoints", () => {
     const variants = [
       { id: "a", name: "A", path: "a.pmx" },

@@ -2,6 +2,7 @@ import type {
   ArtifactEntrypoints,
   ResourceCatalog,
   ResourceKind,
+  StageRenderProfile,
 } from "@wallpaper/resource-schema";
 
 export type IsoDateTime = string;
@@ -51,6 +52,7 @@ export interface CachedResourceVersionRecord {
   sha256: string;
   byteSize: number;
   entrypoints: ArtifactEntrypoints;
+  render?: StageRenderProfile;
   publishedAt: IsoDateTime;
 }
 

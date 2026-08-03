@@ -10,6 +10,7 @@ import {
   resolveArtifactEntrypoints,
   type ArtifactEntrypoints,
   type ResolvedArtifactEntrypoint,
+  type StageRenderProfile,
 } from "@wallpaper/resource-schema";
 import type {
   ModelList,
@@ -143,6 +144,7 @@ interface VersionFiles {
   paths: string[];
   virtualUrls: Map<string, string>;
   entrypoints: ArtifactEntrypoints;
+  render: StageRenderProfile | undefined;
 }
 
 function resolveVirtualUrl(
@@ -226,6 +228,7 @@ export async function materializeLibrary(
         paths,
         virtualUrls,
         entrypoints: version.entrypoints,
+        render: version.render,
       });
       resourceMap.set(version.id, { resource, versionId: version.id });
 
@@ -277,6 +280,9 @@ export async function materializeLibrary(
             id: playerIdForEntrypoint(id, entrypoint),
             name: entrypoint.name ?? resource.name,
             modelPath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            ...(entrypoint.id === null
+              ? {}
+              : { group: resource.name }),
             remark: entrypoint.remark ?? resource.description ?? undefined,
           });
         }
@@ -346,7 +352,13 @@ export async function materializeLibrary(
             id: playerIdForEntrypoint(id, entrypoint),
             name: entrypoint.name ?? resource.name,
             stagePath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            ...(entrypoint.id === null
+              ? {}
+              : { group: resource.name }),
             remark: entrypoint.remark ?? resource.description ?? undefined,
+            ...(files.render === undefined
+              ? {}
+              : { render: files.render }),
           });
         }
         break;
@@ -362,6 +374,9 @@ export async function materializeLibrary(
             id: playerIdForEntrypoint(id, entrypoint),
             name: entrypoint.name ?? resource.name,
             skyboxPath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+            ...(entrypoint.id === null
+              ? {}
+              : { group: resource.name }),
             remark: entrypoint.remark ?? resource.description ?? undefined,
           });
         }
