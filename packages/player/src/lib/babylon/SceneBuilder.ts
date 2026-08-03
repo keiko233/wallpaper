@@ -53,6 +53,12 @@ RegisterDxBmpTextureLoader();
 // MMD skydomes commonly extend to roughly 1,000 scene units.
 const SCENE_CAMERA_MAX_Z = 5_000;
 
+// A physics explosion (repeated interpenetration feedback) flings physics-
+// driven bones far beyond the model's own extent. MMD models are roughly
+// 160 scene units tall, so 500 is safely beyond even extreme dance poses.
+const PHYSICS_EXPLOSION_DEVIATION = 500;
+const PHYSICS_EXPLOSION_FRAMES = 3;
+
 interface MmdMaterialState {
   material: MmdStandardMaterial;
   sphereTexture: MmdStandardMaterial["sphereTexture"];
@@ -281,7 +287,11 @@ export class SceneBuilder implements ISceneBuilder {
   }
 
   private setupMmdRuntime(): void {
-    this.mmdRuntime = new MmdRuntime(this.scene, new MmdPhysics(this.scene));
+    const mmdPhysics = new MmdPhysics(this.scene);
+    // Some PMX models have oddly bent joint limits under Havok; clamping a
+    // wider angular range reduces constraint-solver jitter at load time.
+    mmdPhysics.angularLimitClampThreshold = (15 * Math.PI) / 180;
+    this.mmdRuntime = new MmdRuntime(this.scene, mmdPhysics);
     this.mmdRuntime.register(this.scene);
 
     this.audioPlayer = new StreamAudioPlayer(this.scene);
@@ -509,6 +519,11 @@ export class SceneBuilder implements ISceneBuilder {
     const modelAnimationHandle = mmdModel.createRuntimeAnimation(modelAnimation);
     mmdModel.setRuntimeAnimation(modelAnimationHandle);
 
+    // Evaluate the motion's first frame immediately so the rigid bodies are
+    // initialized at the playback pose (not the PMX bind pose) on the first
+    // physics tick, and settle there while the animation is still paused.
+    mmdModel.beforePhysics(0);
+
     const bodyBone = mmdModel.runtimeBones.find(
       (bone) => bone.name === "センター",
     )!;
@@ -522,6 +537,58 @@ export class SceneBuilder implements ISceneBuilder {
         this.shadowGenerator.getLight().position,
       );
       this.shadowGenerator.getLight().position.y -= 10;
+    });
+
+    // Physics explosion watchdog. If repeated interpenetration feedback
+    // flings the physics-driven bones (hair, skirt, ...) far from the body,
+    // snap everything back to the current playback pose before the scene
+    // becomes permanently broken.
+    const physicsBones = mmdModel.runtimeBones.filter(
+      (bone) => bone.transformAfterPhysics,
+    );
+    const bodyBoneWorldMatrix = new Matrix();
+    const physicsBoneWorldMatrix = new Matrix();
+    const bodyBoneWorldPosition = new Vector3();
+    const physicsBoneWorldPosition = new Vector3();
+    let brokenPhysicsFrames = 0;
+    this.scene.onBeforeRenderObservable.add(() => {
+      bodyBone
+        .getWorldMatrixToRef(bodyBoneWorldMatrix)
+        .getTranslationToRef(bodyBoneWorldPosition);
+
+      let maxDeviation = 0;
+      for (const bone of physicsBones) {
+        const position = bone
+          .getWorldMatrixToRef(physicsBoneWorldMatrix)
+          .getTranslationToRef(physicsBoneWorldPosition);
+        if (
+          !isFinite(position.x) ||
+          !isFinite(position.y) ||
+          !isFinite(position.z)
+        ) {
+          maxDeviation = Number.POSITIVE_INFINITY;
+          break;
+        }
+        const deviation = Vector3.Distance(position, bodyBoneWorldPosition);
+        if (maxDeviation < deviation) {
+          maxDeviation = deviation;
+        }
+      }
+
+      if (maxDeviation > PHYSICS_EXPLOSION_DEVIATION) {
+        brokenPhysicsFrames += 1;
+        if (brokenPhysicsFrames >= PHYSICS_EXPLOSION_FRAMES) {
+          // Restore the bind pose, re-apply the animation at the current
+          // playback time, then snap the bodies there with zero velocity.
+          mmdModel.setRuntimeAnimation(null);
+          mmdModel.setRuntimeAnimation(modelAnimationHandle);
+          mmdModel.beforePhysics(this.mmdRuntime.currentTime * 30);
+          mmdModel.initializePhysics();
+          brokenPhysicsFrames = 0;
+        }
+      } else {
+        brokenPhysicsFrames = 0;
+      }
     });
 
     const defaultPipeline = (this.defaultPipeline = new DefaultRenderingPipeline(
