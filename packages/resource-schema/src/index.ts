@@ -133,6 +133,16 @@ const stageLightingSchema = z
   })
   .strict();
 
+const stageShadowSchema = z
+  .object({
+    orthoScale: z.number().min(0).max(1).default(0.1),
+    bias: z.number().min(0).max(0.05).default(0.0005),
+    normalBias: z.number().min(0).max(1).default(0.02),
+    contactHardeningLightSizeUVRatio: z.number().min(0).max(1).default(0.05),
+    excludedCasterMaterialNames: stageMaterialNamesSchema.optional(),
+  })
+  .strict();
+
 const stageMaterialPbrSchema = z
   .object({
     materialNames: stageMaterialNamesSchema,
@@ -191,6 +201,7 @@ export const StageRenderProfileSchema = z
       .optional(),
     environment: stageEnvironmentSchema.optional(),
     lighting: stageLightingSchema.optional(),
+    shadow: stageShadowSchema.optional(),
   })
   .strict();
 

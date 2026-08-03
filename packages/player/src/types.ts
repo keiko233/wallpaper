@@ -59,6 +59,13 @@ export interface StageRenderProfile {
       range: number;
     }[];
   };
+  shadow?: {
+    orthoScale: number;
+    bias: number;
+    normalBias: number;
+    contactHardeningLightSizeUVRatio: number;
+    excludedCasterMaterialNames?: string[];
+  };
   reflection?: {
     materialNames: string[];
     textureSize: number;

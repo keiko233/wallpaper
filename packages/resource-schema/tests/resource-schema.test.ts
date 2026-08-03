@@ -971,6 +971,86 @@ describe("resource schema", () => {
     ).toThrow();
   });
 
+  it("applies defaults to stage shadow profiles", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        shadow: {},
+      },
+    });
+
+    expect(parsed.render?.shadow).toEqual({
+      orthoScale: 0.1,
+      bias: 0.0005,
+      normalBias: 0.02,
+      contactHardeningLightSizeUVRatio: 0.05,
+    });
+  });
+
+  it("carries excluded caster material names in stage shadow profiles", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        shadow: {
+          excludedCasterMaterialNames: ["地板", "窗户"],
+        },
+      },
+    });
+
+    expect(parsed.render?.shadow).toEqual({
+      orthoScale: 0.1,
+      bias: 0.0005,
+      normalBias: 0.02,
+      contactHardeningLightSizeUVRatio: 0.05,
+      excludedCasterMaterialNames: ["地板", "窗户"],
+    });
+  });
+
+  it("rejects invalid stage shadow profile values", () => {
+    const stage = {
+      ...definition,
+      kind: "stage",
+    };
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { orthoScale: 1.5 } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { bias: 0.06 } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { normalBias: 1.1 } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { contactHardeningLightSizeUVRatio: -0.1 } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { excludedCasterMaterialNames: [] } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { shadow: { unknownKey: 1 } },
+      }),
+    ).toThrow(/unrecognized_keys/u);
+  });
+
   it("accepts render profiles in catalogs only for stage resources", () => {
     const resource = {
       ...definition,

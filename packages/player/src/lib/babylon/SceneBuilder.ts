@@ -284,15 +284,9 @@ export class SceneBuilder implements ISceneBuilder {
     directionalLight.diffuse = Color3.FromHexString(
       this.renderSettings.directionalLightColor,
     ).toLinearSpace();
-    directionalLight.autoCalcShadowZBounds = false;
-    directionalLight.autoUpdateExtends = false;
-    directionalLight.shadowMaxZ = 20;
-    directionalLight.shadowMinZ = -20;
-    directionalLight.orthoTop = 18;
-    directionalLight.orthoBottom = -3;
-    directionalLight.orthoLeft = -10;
-    directionalLight.orthoRight = 10;
-    directionalLight.shadowOrthoScale = 0;
+    directionalLight.autoCalcShadowZBounds = true;
+    directionalLight.autoUpdateExtends = true;
+    directionalLight.shadowOrthoScale = 0.1;
 
     this.shadowGenerator = new ShadowGenerator(1024, directionalLight, true);
     this.shadowGenerator.transparencyShadow = true;
@@ -612,6 +606,14 @@ export class SceneBuilder implements ISceneBuilder {
         mesh.receiveShadows = true;
       }
       this.shadowGenerator.addShadowCaster(stageMesh);
+      const excludedNames = this.renderSettings.stageEffectsEnabled
+        ? this.stageRenderProfile?.shadow?.excludedCasterMaterialNames
+        : undefined;
+      if (excludedNames !== undefined) {
+        for (const mesh of this.findStageMeshes(stageMesh, excludedNames)) {
+          this.shadowGenerator.removeShadowCaster(mesh, false);
+        }
+      }
       this.ground?.setEnabled(false);
     }
 
@@ -955,12 +957,23 @@ export class SceneBuilder implements ISceneBuilder {
       if (this.shadowGenerator.mapSize !== settings.shadowMapSize) {
         this.shadowGenerator.mapSize = settings.shadowMapSize;
       }
+      const profileShadow = settings.stageEffectsEnabled
+        ? this.stageRenderProfile?.shadow
+        : undefined;
       if (settings.shadowFiltering === "pcss") {
         this.shadowGenerator.usePercentageCloserFiltering = false;
         this.shadowGenerator.useContactHardeningShadow = true;
+        this.shadowGenerator.contactHardeningLightSizeUVRatio =
+          profileShadow?.contactHardeningLightSizeUVRatio ?? 0.05;
       } else {
         this.shadowGenerator.useContactHardeningShadow = false;
         this.shadowGenerator.usePercentageCloserFiltering = true;
+      }
+      this.shadowGenerator.bias = profileShadow?.bias ?? 0.0005;
+      this.shadowGenerator.normalBias = profileShadow?.normalBias ?? 0.02;
+      if (this.directionalLight !== undefined) {
+        this.directionalLight.shadowOrthoScale =
+          profileShadow?.orthoScale ?? 0.1;
       }
     }
 
