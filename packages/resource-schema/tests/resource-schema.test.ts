@@ -411,6 +411,177 @@ describe("resource schema", () => {
     ).toThrow(/only for stage resources/u);
   });
 
+  it("applies defaults to stage material PBR overrides", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        materials: [
+          {
+            materialNames: ["地板", "水纹"],
+            kind: "pbr",
+          },
+        ],
+      },
+    });
+
+    expect(parsed.render).toEqual({
+      materials: [
+        {
+          materialNames: ["地板", "水纹"],
+          kind: "pbr",
+          metallic: 0,
+          roughness: 0.7,
+          environmentIntensity: 1,
+          directIntensity: 1,
+        },
+      ],
+    });
+  });
+
+  it("applies clear coat defaults to stage material PBR overrides", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...definition,
+      kind: "stage",
+      render: {
+        materials: [
+          {
+            materialNames: ["玻璃"],
+            kind: "pbr",
+            metallic: 0.5,
+            roughness: 0.3,
+            clearCoat: {},
+          },
+        ],
+      },
+    });
+
+    expect(parsed.render).toEqual({
+      materials: [
+        {
+          materialNames: ["玻璃"],
+          kind: "pbr",
+          metallic: 0.5,
+          roughness: 0.3,
+          environmentIntensity: 1,
+          directIntensity: 1,
+          clearCoat: { intensity: 0, roughness: 0 },
+        },
+      ],
+    });
+  });
+
+  it("rejects invalid stage material PBR override values", () => {
+    const stage = {
+      ...definition,
+      kind: "stage",
+    };
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: { materials: [] },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [{ materialNames: [], kind: "pbr" }],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [{ materialNames: ["地板"], kind: "standard" }],
+        },
+      }),
+    ).toThrow(/Invalid input: expected/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [
+            { materialNames: ["地板"], kind: "pbr", unknownKey: 1 },
+          ],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [{ materialNames: ["地板"], kind: "pbr", metallic: 2 }],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [{ materialNames: ["地板"], kind: "pbr", roughness: -1 }],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [
+            {
+              materialNames: ["地板"],
+              kind: "pbr",
+              environmentIntensity: 6,
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [
+            {
+              materialNames: ["地板"],
+              kind: "pbr",
+              directIntensity: -1,
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [
+            {
+              materialNames: ["地板"],
+              kind: "pbr",
+              clearCoat: { intensity: 2 },
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          materials: [
+            {
+              materialNames: ["地板"],
+              kind: "pbr",
+              clearCoat: { roughness: 1.5 },
+            },
+          ],
+        },
+      }),
+    ).toThrow();
+  });
+
   it("rejects invalid stage render profile values", () => {
     const stage = {
       ...definition,

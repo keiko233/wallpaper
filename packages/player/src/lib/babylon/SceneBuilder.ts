@@ -30,6 +30,8 @@ import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
 import type { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
 import { ShadowOnlyMaterial } from "@babylonjs/materials/shadowOnly";
 import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
@@ -1025,6 +1027,12 @@ export class SceneBuilder implements ISceneBuilder {
     const profile = this.stageRenderProfile;
     if (profile === null) return;
 
+    // Material overrides run first so the reflection and emissive effects
+    // operate on the final material type (PBR or MMD standard).
+    if (profile.materials !== undefined) {
+      this.applyStageMaterials(profile.materials, stageMesh);
+    }
+
     if (profile.reflection !== undefined) {
       this.applyStageReflection(
         profile.reflection,
@@ -1055,24 +1063,99 @@ export class SceneBuilder implements ISceneBuilder {
 
   /**
    * Clones a stage material so profile effects never mutate loader state.
-   * Cloned materials keep the MMD shader (reflection and emissive are part
-   * of the underlying standard shader) and remain toggleable per mesh.
+   * MmdStandardMaterial clones keep the MMD shader and stay tracked for
+   * sphere/toon toggling; PBRMaterial clones are the converted stage look and
+   * are tracked separately. Reflection and emissive are native PBR properties
+   * and part of the MMD standard shader alike, so both stay toggleable.
    */
-  private cloneStageMaterial(mesh: Mesh): MmdStandardMaterial | null {
+  private cloneStageMaterial(
+    mesh: Mesh,
+  ): MmdStandardMaterial | PBRMaterial | null {
     const source = mesh.material;
-    if (!(source instanceof MmdStandardMaterial)) return null;
+    if (source instanceof MmdStandardMaterial) {
+      const clone = source.clone(
+        `${mesh.name}_stageRender_${this.stageCloneIndex++}`,
+        true,
+      );
+      mesh.material = clone;
+      this.materialStates.push({
+        material: clone,
+        sphereTexture: clone.sphereTexture,
+        toonTexture: clone.toonTexture,
+      });
+      return clone;
+    }
+    if (source instanceof PBRMaterial) {
+      const clone = source.clone(
+        `${mesh.name}_stageRender_${this.stageCloneIndex++}`,
+        true,
+      );
+      mesh.material = clone;
+      return clone;
+    }
+    return null;
+  }
 
-    const clone = source.clone(
-      `${mesh.name}_stageRender_${this.stageCloneIndex++}`,
-      true,
+  private applyStageMaterials(
+    groups: NonNullable<StageRenderProfile["materials"]>,
+    stageMesh: MmdMesh,
+  ): void {
+    for (const group of groups) {
+      for (const mesh of this.findStageMeshes(
+        stageMesh,
+        group.materialNames,
+      )) {
+        this.convertStageMaterialToPbr(mesh, group);
+      }
+    }
+  }
+
+  /**
+   * Converts a matched MmdStandardMaterial to a Babylon PBRMaterial, cloning
+   * the visible base appearance (name, diffuse as albedo, alpha, culling and
+   * texture alpha behavior) so the loader-owned instance is never mutated.
+   */
+  private convertStageMaterialToPbr(
+    mesh: Mesh,
+    overrides: NonNullable<
+      NonNullable<StageRenderProfile["materials"]>[number]
+    >,
+  ): void {
+    const source = mesh.material;
+    if (!(source instanceof MmdStandardMaterial)) return;
+
+    const pbr = new PBRMaterial(
+      `${mesh.name}_stagePbr_${this.stageCloneIndex++}`,
+      this.scene,
     );
-    mesh.material = clone;
-    this.materialStates.push({
-      material: clone,
-      sphereTexture: clone.sphereTexture,
-      toonTexture: clone.toonTexture,
-    });
-    return clone;
+    pbr.name = source.name;
+    pbr.albedoColor = source.diffuseColor.clone();
+    pbr.albedoTexture = source.diffuseTexture;
+    pbr.alpha = source.alpha;
+    pbr.backFaceCulling = source.backFaceCulling;
+    pbr.sideOrientation = source.sideOrientation;
+    pbr.transparencyMode = source.transparencyMode;
+    pbr.useAlphaFromAlbedoTexture = source.useAlphaFromDiffuseTexture;
+    pbr.metallic = overrides.metallic;
+    pbr.roughness = overrides.roughness;
+    pbr.environmentIntensity = overrides.environmentIntensity;
+    pbr.directIntensity = overrides.directIntensity;
+    if (overrides.clearCoat !== undefined) {
+      pbr.clearCoat.isEnabled = true;
+      pbr.clearCoat.intensity = overrides.clearCoat.intensity;
+      pbr.clearCoat.roughness = overrides.clearCoat.roughness;
+    }
+
+    mesh.material = pbr;
+  }
+
+  /** The diffuse/albedo texture shared by MMD and PBR stage materials. */
+  private getStageMaterialBaseTexture(
+    material: MmdStandardMaterial | PBRMaterial,
+  ): BaseTexture | null {
+    return material instanceof MmdStandardMaterial
+      ? material.diffuseTexture
+      : material.albedoTexture;
   }
 
   private applyStageReflection(
@@ -1123,7 +1206,7 @@ export class SceneBuilder implements ISceneBuilder {
       clone.reflectionTexture = mirror;
       // Textureless reflectors are water sheets; make them translucent so
       // they read as a wet film over the floor below.
-      if (clone.diffuseTexture === null) {
+      if (this.getStageMaterialBaseTexture(clone) === null) {
         clone.alpha = reflection.strength;
       }
     }
@@ -1152,10 +1235,11 @@ export class SceneBuilder implements ISceneBuilder {
         const clone = this.cloneStageMaterial(mesh);
         if (clone === null) continue;
         clone.emissiveColor = color;
-        // Reuse the diffuse texture as an emissive mask so bright areas of
+        // Reuse the base texture as an emissive mask so bright areas of
         // the texture (moon, lamps) drive where the glow appears.
-        if (clone.diffuseTexture !== null) {
-          clone.emissiveTexture = clone.diffuseTexture;
+        const baseTexture = this.getStageMaterialBaseTexture(clone);
+        if (baseTexture !== null) {
+          clone.emissiveTexture = baseTexture;
         }
         glowLayer.addIncludedOnlyMesh(mesh);
       }

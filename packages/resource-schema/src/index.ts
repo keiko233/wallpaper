@@ -85,6 +85,24 @@ const stageMaterialNamesSchema = z
   .min(1)
   .max(32);
 
+const stageMaterialPbrSchema = z
+  .object({
+    materialNames: stageMaterialNamesSchema,
+    kind: z.literal("pbr"),
+    metallic: z.number().min(0).max(1).default(0),
+    roughness: z.number().min(0).max(1).default(0.7),
+    environmentIntensity: z.number().min(0).max(5).default(1),
+    directIntensity: z.number().min(0).max(5).default(1),
+    clearCoat: z
+      .object({
+        intensity: z.number().min(0).max(1).default(0),
+        roughness: z.number().min(0).max(1).default(0),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 /**
  * Optional native render profile carried by stage resources. The player uses
  * it to approximate a stage author's intended look (reflective floors,
@@ -92,6 +110,7 @@ const stageMaterialNamesSchema = z
  */
 export const StageRenderProfileSchema = z
   .object({
+    materials: z.array(stageMaterialPbrSchema).min(1).max(32).optional(),
     reflection: z
       .object({
         materialNames: stageMaterialNamesSchema,

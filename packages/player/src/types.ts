@@ -23,6 +23,18 @@ export interface ModelList {
  * player's dependency ownership.
  */
 export interface StageRenderProfile {
+  materials?: {
+    materialNames: string[];
+    kind: "pbr";
+    metallic: number;
+    roughness: number;
+    environmentIntensity: number;
+    directIntensity: number;
+    clearCoat?: {
+      intensity: number;
+      roughness: number;
+    };
+  }[];
   reflection?: {
     materialNames: string[];
     textureSize: number;
