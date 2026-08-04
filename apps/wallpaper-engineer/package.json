@@ -1,12 +1,10 @@
 {
-  "name": "@wallpaper/client",
+  "name": "@wallpaper/wallpaper-engineer",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "build:wallpaper-engine": "VITE_CLIENT_TARGET=wallpaper-engine vite build",
-    "deploy": "wrangler deploy",
     "dev": "vite",
     "preview": "vite preview"
   },

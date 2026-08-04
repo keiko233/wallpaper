@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "../../node_modules/.tmp/client-app.tsbuildinfo",
+    "tsBuildInfoFile": "../../node_modules/.tmp/web-app.tsbuildinfo",
     "types": ["node", "vite/client"]
   },
   "include": ["src", "tests"]

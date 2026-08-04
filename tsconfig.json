@@ -6,7 +6,9 @@
     { "path": "./packages/ui" },
     { "path": "./packages/ammo-wasm" },
     { "path": "./packages/player" },
-    { "path": "./apps/client/tsconfig.app.json" },
-    { "path": "./apps/client/tsconfig.node.json" }
+    { "path": "./apps/web/tsconfig.app.json" },
+    { "path": "./apps/web/tsconfig.node.json" },
+    { "path": "./apps/wallpaper-engineer/tsconfig.app.json" },
+    { "path": "./apps/wallpaper-engineer/tsconfig.node.json" }
   ]
 }

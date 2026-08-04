@@ -69,7 +69,41 @@ importers:
         specifier: ^4.114.0
         version: 4.114.0(@cloudflare/workers-types@5.20260724.1)
 
-  apps/client:
+  apps/wallpaper-engineer:
+    dependencies:
+      '@wallpaper/player':
+        specifier: workspace:*
+        version: link:../../packages/player
+      '@wallpaper/resource-schema':
+        specifier: workspace:*
+        version: link:../../packages/resource-schema
+      '@wallpaper/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@zip.js/zip.js':
+        specifier: ^2.8.34
+        version: 2.8.34
+      dexie:
+        specifier: ^4.4.4
+        version: 4.4.4
+      hash-wasm:
+        specifier: ^4.12.0
+        version: 4.12.0
+      lucide-react:
+        specifier: ^1.25.0
+        version: 1.25.0(react@19.2.7)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@wallpaper/resource-catalog':
+        specifier: workspace:*
+        version: link:../../packages/resource-catalog
+
+  apps/web:
     dependencies:
       '@wallpaper/player':
         specifier: workspace:*

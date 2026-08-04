@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "../../node_modules/.tmp/client-node.tsbuildinfo",
+    "tsBuildInfoFile": "../../node_modules/.tmp/wallpaper-engineer-node.tsbuildinfo",
     "lib": ["ES2023"],
     "types": ["node"],
     "module": "NodeNext",
