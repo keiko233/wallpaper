@@ -46,6 +46,12 @@ export default defineConfig({
       project: resolve(workspaceRoot, "packages/i18n/project.inlang"),
       outdir: resolve(workspaceRoot, "packages/i18n/src/paraglide"),
       strategy: ["localStorage", "preferredLanguage", "baseLocale"],
+      // Keep the plugin's output byte-identical to `pnpm i18n:compile`
+      // (which is what gets committed) so `vite dev`/`vite build` never
+      // clobbers the checked-in generated files.
+      emitTsDeclarations: true,
+      isServer: "typeof window === 'undefined'",
+      outputStructure: "message-modules",
     }),
     tailwindcss(),
     react(),
