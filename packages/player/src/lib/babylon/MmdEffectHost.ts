@@ -3,7 +3,6 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Material } from "@babylonjs/core/Materials/material";
 import { MirrorTexture } from "@babylonjs/core/Materials/Textures/mirrorTexture";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Plane } from "@babylonjs/core/Maths/math.plane";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -12,16 +11,15 @@ import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { MmdMesh } from "babylon-mmd/esm/Runtime/mmdMesh";
 import type { StageRenderProfile } from "../../types";
 import { applyMmePostProcess } from "./MmdPostProcessAdapter";
+import { createFloorMirrorPlane } from "./mirror-plane";
+import { getMeshGeometryBounds } from "./mesh-geometry-bounds";
+import {
+  fitWorkingFloorToMeshes,
+  inferWorkingFloorFit,
+  mergeMeshBounds,
+} from "./working-floor-fit";
 
 type MmeEffectProfile = NonNullable<StageRenderProfile["effects"]>[number];
-
-interface FloorFit {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-  y: number;
-}
 
 export interface MmdEffectHostOptions {
   scene: Scene;
@@ -29,6 +27,7 @@ export interface MmdEffectHostOptions {
   stageMesh: MmdMesh;
   modelMesh: MmdMesh;
   skyboxMesh: MmdMesh | null;
+  preferredFloorMeshes?: readonly Mesh[];
   resolveStageUrl(relativePath: string): string;
 }
 
@@ -44,6 +43,7 @@ export class MmdEffectHost {
   private readonly stageMesh: MmdMesh;
   private readonly modelMesh: MmdMesh;
   private readonly skyboxMesh: MmdMesh | null;
+  private readonly preferredFloorMeshes: readonly Mesh[];
   private readonly resolveStageUrl: (relativePath: string) => string;
 
   public constructor(options: MmdEffectHostOptions) {
@@ -52,6 +52,7 @@ export class MmdEffectHost {
     this.stageMesh = options.stageMesh;
     this.modelMesh = options.modelMesh;
     this.skyboxMesh = options.skyboxMesh;
+    this.preferredFloorMeshes = options.preferredFloorMeshes ?? [];
     this.resolveStageUrl = options.resolveStageUrl;
   }
 
@@ -177,7 +178,10 @@ export class MmdEffectHost {
       reflector.scaling.x = (floor.maxX - floor.minX) / sourceWidth;
       reflector.scaling.z = (floor.maxZ - floor.minZ) / sourceDepth;
     }
-    const mirrorPlaneY = floor.y + profile.planeOffset;
+    // WorkingFloor reflects around the accessory origin. ADD_HEIGHT only
+    // raises the drawn sheet to avoid z-fighting with the authored floor.
+    const mirrorPlaneY = floor.y;
+    const reflectorSurfaceY = floor.y + profile.planeOffset;
     const rootWorldInverse = this.root
       .computeWorldMatrix(true)
       .clone()
@@ -185,7 +189,7 @@ export class MmdEffectHost {
     const localCenter = Vector3.TransformCoordinates(
       new Vector3(
         (floor.minX + floor.maxX) * 0.5,
-        mirrorPlaneY,
+        reflectorSurfaceY,
         (floor.minZ + floor.maxZ) * 0.5,
       ),
       rootWorldInverse,
@@ -203,10 +207,7 @@ export class MmdEffectHost {
       this.scene,
       false,
     );
-    mirror.mirrorPlane = Plane.FromPositionAndNormal(
-      new Vector3(0, mirrorPlaneY, 0),
-      Vector3.Up(),
-    );
+    mirror.mirrorPlane = createFloorMirrorPlane(mirrorPlaneY);
     mirror.renderList = [
       ...this.modelMesh.metadata.meshes,
       ...this.stageMesh.metadata.meshes,
@@ -227,54 +228,51 @@ export class MmdEffectHost {
     );
     material.backFaceCulling = false;
     reflector.material = material;
+
+    reflector.computeWorldMatrix(true);
+    const reflectorBounds = reflector.getBoundingInfo().boundingBox;
+    console.info(
+      `[MME ${profile.sourcePath}] Applied WorkingFloor reflection ${JSON.stringify({
+        planeY: mirrorPlaneY,
+        surfaceY: reflectorSurfaceY,
+        bounds: {
+          minX: floor.minX,
+          maxX: floor.maxX,
+          minZ: floor.minZ,
+          maxZ: floor.maxZ,
+        },
+        reflectorY: {
+          min: reflectorBounds.minimumWorld.y,
+          max: reflectorBounds.maximumWorld.y,
+        },
+        opacity: material.alpha,
+        textureSize: profile.textureSize,
+        preferredFloorMeshes: this.preferredFloorMeshes.map(
+          (mesh) => mesh.material?.name ?? mesh.name,
+        ),
+      })}`,
+    );
   }
 
-  /**
-   * Finds a broad, thin mesh near the bottom of the stage. This replaces the
-   * old per-stage material-name list while keeping the accessory aligned with
-   * the authored floor. The whole-stage bounds are a safe fallback.
-   */
-  private inferFloorFit(): FloorFit {
-    const stageBounds = this.stageMesh.getHierarchyBoundingVectors(true);
-    const stageHeight = Math.max(1e-6, stageBounds.max.y - stageBounds.min.y);
-    const upperFloorLimit = stageBounds.min.y + stageHeight * 0.35;
-    let best: FloorFit | null = null;
-    let bestScore = 0;
+  private inferFloorFit(): ReturnType<typeof inferWorkingFloorFit> {
+    const preferredBounds = this.preferredFloorMeshes
+      .map(getMeshGeometryBounds)
+      .filter((bounds) => bounds !== null);
+    const preferredFit = fitWorkingFloorToMeshes(preferredBounds);
+    if (preferredFit !== null) return preferredFit;
 
-    for (const mesh of this.stageMesh.metadata.meshes) {
-      const bounds = mesh.getHierarchyBoundingVectors(true);
-      const width = bounds.max.x - bounds.min.x;
-      const depth = bounds.max.z - bounds.min.z;
-      const thickness = bounds.max.y - bounds.min.y;
-      const area = width * depth;
-      if (
-        area <= 0 ||
-        bounds.max.y > upperFloorLimit ||
-        thickness > stageHeight * 0.15
-      ) {
-        continue;
-      }
-      const score = area / Math.max(0.05, thickness + 0.05);
-      if (score > bestScore) {
-        bestScore = score;
-        best = {
-          minX: bounds.min.x,
-          maxX: bounds.max.x,
-          minZ: bounds.min.z,
-          maxZ: bounds.max.z,
-          y: bounds.max.y,
-        };
-      }
-    }
-
-    return (
-      best ?? {
-        minX: stageBounds.min.x,
-        maxX: stageBounds.max.x,
-        minZ: stageBounds.min.z,
-        maxZ: stageBounds.max.z,
-        y: stageBounds.min.y,
-      }
+    const stageGeometryBounds = this.stageMesh.metadata.meshes
+      .map(getMeshGeometryBounds)
+      .filter((bounds) => bounds !== null);
+    const stageBounds =
+      mergeMeshBounds(stageGeometryBounds) ??
+      (() => {
+        const hierarchy = this.stageMesh.getHierarchyBoundingVectors(true);
+        return { min: hierarchy.min, max: hierarchy.max };
+      })();
+    return inferWorkingFloorFit(
+      stageBounds,
+      stageGeometryBounds,
     );
   }
 

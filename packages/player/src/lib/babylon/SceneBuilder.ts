@@ -46,10 +46,11 @@ import { MirrorTexture } from "@babylonjs/core/Materials/Textures/mirrorTexture"
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { SSAORenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssaoRenderingPipeline";
 import { SSRRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline";
-import { Plane } from "@babylonjs/core/Maths/math.plane";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MmdEffectHost } from "./MmdEffectHost";
 import { MmdModelEffectHost } from "./MmdModelEffectHost";
+import { createFloorMirrorPlane } from "./mirror-plane";
+import { aggregateVmdPhysicsToggleWarnings } from "./vmd-loader-logging";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
   type MmdMaterialRenderMode,
@@ -85,6 +86,7 @@ const PHYSICS_ENABLE_RAMP_FRAMES = 45;
 // PHYSICS_MAX_RECOVERY_COOLDOWN_FRAMES.
 const PHYSICS_RECOVERY_COOLDOWN_FRAMES = 60;
 const PHYSICS_MAX_RECOVERY_COOLDOWN_FRAMES = 240;
+const FLOOR_MATERIAL_NAME_PATTERN = /floor|ground|地面|床|フロア/iu;
 
 interface MmdMaterialState {
   material: MmdStandardMaterial;
@@ -394,38 +396,52 @@ export class SceneBuilder implements ISceneBuilder {
     );
   }
 
-  private loadModelMotion(): Promise<MmdAnimation> {
+  private async loadModelMotion(): Promise<MmdAnimation> {
     const vmdLoader = new VmdLoader(this.scene);
-    vmdLoader.loggingEnabled = true;
-
-    return vmdLoader.loadAsync(
-      "model-motion",
-      this.motionPaths,
-      ({ loaded, total }) => {
-        console.log(
-          `Loading model motion... ${loaded}/${total} (${Math.floor((loaded * 100) / total)}%)`,
-        );
-      },
+    const finishWarnings = aggregateVmdPhysicsToggleWarnings(
+      vmdLoader,
+      "Model motion",
     );
+
+    try {
+      return await vmdLoader.loadAsync(
+        "model-motion",
+        this.motionPaths,
+        ({ loaded, total }) => {
+          console.log(
+            `Loading model motion... ${loaded}/${total} (${Math.floor((loaded * 100) / total)}%)`,
+          );
+        },
+      );
+    } finally {
+      finishWarnings();
+    }
   }
 
-  private loadCameraMotion(): Promise<MmdAnimation | null> {
+  private async loadCameraMotion(): Promise<MmdAnimation | null> {
     if (this.cameraPath === undefined) {
-      return Promise.resolve(null);
+      return null;
     }
 
     const vmdLoader = new VmdLoader(this.scene);
-    vmdLoader.loggingEnabled = true;
-
-    return vmdLoader.loadAsync(
-      "camera-motion",
-      [this.cameraPath],
-      ({ loaded, total }) => {
-        console.log(
-          `Loading camera motion... ${loaded}/${total} (${Math.floor((loaded * 100) / total)}%)`,
-        );
-      },
+    const finishWarnings = aggregateVmdPhysicsToggleWarnings(
+      vmdLoader,
+      "Camera motion",
     );
+
+    try {
+      return await vmdLoader.loadAsync(
+        "camera-motion",
+        [this.cameraPath],
+        ({ loaded, total }) => {
+          console.log(
+            `Loading camera motion... ${loaded}/${total} (${Math.floor((loaded * 100) / total)}%)`,
+          );
+        },
+      );
+    } finally {
+      finishWarnings();
+    }
   }
 
   private async loadMmdMesh(
@@ -1100,6 +1116,15 @@ export class SceneBuilder implements ISceneBuilder {
     const profile = this.stageRenderProfile;
     if (profile === null) return;
 
+    console.info("[Stage render] Applying profile", {
+      stage: stageMesh.name,
+      mmeEffects: profile.effects?.length ?? 0,
+      pbrGroups: profile.materials?.length ?? 0,
+      planarReflection: profile.reflection !== undefined,
+      emissiveGroups: profile.emissive?.length ?? 0,
+      bloom: profile.bloom !== undefined,
+    });
+
     // Material overrides run first so the reflection and emissive effects
     // operate on the final material type (PBR or MMD standard).
     if (profile.materials !== undefined) {
@@ -1126,12 +1151,19 @@ export class SceneBuilder implements ISceneBuilder {
       this.applyStageEmissive(profile.emissive, stageMesh);
     }
     if (profile.effects !== undefined) {
+      const preferredFloorMaterialNames = (profile.materials ?? [])
+        .flatMap(({ materialNames }) => materialNames)
+        .filter((name) => FLOOR_MATERIAL_NAME_PATTERN.test(name));
       this.mmdEffectHost = new MmdEffectHost({
         scene: this.scene,
         root: this.mmdRoot,
         stageMesh,
         modelMesh,
         skyboxMesh,
+        preferredFloorMeshes: this.findStageMeshes(
+          stageMesh,
+          preferredFloorMaterialNames,
+        ),
         resolveStageUrl: (relativePath) =>
           this.resolveStageProfileUrl(relativePath),
       });
@@ -1276,10 +1308,7 @@ export class SceneBuilder implements ISceneBuilder {
       this.scene,
       false,
     );
-    mirror.mirrorPlane = Plane.FromPositionAndNormal(
-      new Vector3(0, planeY, 0),
-      new Vector3(0, 1, 0),
-    );
+    mirror.mirrorPlane = createFloorMirrorPlane(planeY);
     // The standard shader scales planar reflections by the texture level.
     mirror.level = reflection.strength;
     mirror.blurKernel = reflection.blurKernel;
