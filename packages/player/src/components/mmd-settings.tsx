@@ -39,6 +39,7 @@ import { useEffect, useState } from "react";
 import {
   applyRenderQualityPreset,
   getRenderQualityPreset,
+  type MmdFpsLimit,
   type MmdQualityPreset,
   type TextureAnisotropyLevel,
 } from "../types";
@@ -1193,6 +1194,45 @@ export function MmdSettings({
             <p className="text-xs text-muted-foreground">
               Higher rates simulate hair and skirts more smoothly at a CPU
               cost.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Frame rate limit</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (
+                  nextValue === "0" ||
+                  nextValue === "30" ||
+                  nextValue === "60" ||
+                  nextValue === "120" ||
+                  nextValue === "144"
+                ) {
+                  setRenderSettings({
+                    fpsLimit: Number(nextValue) as MmdFpsLimit,
+                  });
+                }
+              }}
+              value={String(renderSettings.fpsLimit)}
+            >
+              <SelectTrigger aria-label="Frame rate limit">
+                <SelectValue>
+                  {renderSettings.fpsLimit === 0
+                    ? "Unlimited"
+                    : `${renderSettings.fpsLimit} FPS`}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Unlimited</SelectItem>
+                <SelectItem value="30">30 FPS</SelectItem>
+                <SelectItem value="60">60 FPS</SelectItem>
+                <SelectItem value="120">120 FPS</SelectItem>
+                <SelectItem value="144">144 FPS</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Caps the renderer to the selected frame rate to lower GPU
+              usage, fan noise and power draw.
             </p>
           </div>
 

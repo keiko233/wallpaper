@@ -137,6 +137,9 @@ export type SsrQualityLevel = "low" | "medium" | "high";
 
 export type TextureAnisotropyLevel = 1 | 4 | 8 | 16;
 
+/** Renderer frame rate cap in FPS (0 disables the cap). */
+export type MmdFpsLimit = 0 | 30 | 60 | 120 | 144;
+
 /**
  * Physics backend. "ammo" (Bullet via Ammo.js) reproduces the original
  * MMD physics: PMX joint springs and per-body damping are honored, which
@@ -216,6 +219,11 @@ export interface MmdRenderSettings {
   physicsSolverIterations: number;
   /** Physics simulation rate in Hz (30, 60 or 120). */
   physicsStepRate: number;
+  /**
+   * Renderer frame rate cap in FPS (0 disables the cap). Skips frames to
+   * lower GPU usage, fan noise and power draw on high-refresh displays.
+   */
+  fpsLimit: MmdFpsLimit;
   /**
    * Global multiplier for PMX joint spring stiffness (0.5-3). Values below
    * 1 make hair and skirts softer and droopier; above 1 makes them stiffer.
@@ -391,6 +399,7 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   physicsBackend: "ammo",
   physicsSolverIterations: 12,
   physicsStepRate: 60,
+  fpsLimit: 0,
   physicsStrength: 1,
 };
 

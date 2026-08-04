@@ -100,6 +100,7 @@ export class MmdController {
 
   public setRenderSettings(settings: MmdRenderSettings): void {
     this.sceneBuilder?.setRenderSettings(settings);
+    this.runtime?.setFpsLimit(settings.fpsLimit);
   }
 
   public setOnEnded(callback: (() => void) | null): void {
