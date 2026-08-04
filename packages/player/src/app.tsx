@@ -30,6 +30,7 @@ import type { ReactNode } from "react";
 
 export interface PlayerAppProps {
   emptyState?: ReactNode;
+  initialPlayDelayMs?: number;
   models?: readonly ModelList[];
   motions?: readonly MotionList[];
   persistence?: PlayerPersistence;
@@ -40,6 +41,7 @@ export interface PlayerAppProps {
 
 export default function App({
   emptyState,
+  initialPlayDelayMs,
   models = DEFAULT_MODELS,
   motions = DEFAULT_MOTIONS,
   persistence,
@@ -95,6 +97,7 @@ export default function App({
 
   return (
     <MmdProvider
+      initialPlayDelayMs={initialPlayDelayMs}
       models={models}
       motions={motions}
       persistence={persistence}

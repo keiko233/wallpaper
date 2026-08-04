@@ -64,6 +64,8 @@ export interface MmdProviderProps {
   initialBackground?: string;
   initialVolume?: number;
   initialPlaybackRate?: number;
+  /** Delay before the very first playback starts, letting reveal transitions finish. */
+  initialPlayDelayMs?: number;
   persistence?: PlayerPersistence;
 }
 
@@ -513,6 +515,7 @@ export function MmdProvider({
   initialBackground = "#FFFFFFFF",
   initialVolume = 0.3,
   initialPlaybackRate = 1,
+  initialPlayDelayMs = PLAYBACK_START_DELAY_MS,
   persistence,
 }: MmdProviderProps) {
   if (
@@ -731,6 +734,7 @@ export function MmdProvider({
   >([null, null]);
   const transitionRequestRef = useRef(0);
   const handleTrackEndRef = useRef<() => void>(() => undefined);
+  const hasStartedInitialPlaybackRef = useRef(false);
 
   backgroundRef.current = background;
   volumeRef.current = volume;
@@ -938,11 +942,17 @@ export function MmdProvider({
 
       // Give the target canvas time to present its first frame before audio and
       // animation resume. This keeps decoding/upload spikes out of playback.
-      await delay(PLAYBACK_START_DELAY_MS);
+      // The first playback waits even longer so the app reveal transition has
+      // finished and the render loop does not start mid-animation.
+      const playDelayMs = hasStartedInitialPlaybackRef.current
+        ? PLAYBACK_START_DELAY_MS
+        : initialPlayDelayMs;
+      await delay(playDelayMs);
       if (request !== transitionRequestRef.current) return;
 
       const played = await targetController.play();
       if (!played || request !== transitionRequestRef.current) return;
+      hasStartedInitialPlaybackRef.current = true;
 
       targetController.setOnEnded(() => handleTrackEndRef.current());
       setStatus("ready");
@@ -960,6 +970,7 @@ export function MmdProvider({
     desiredKey,
     loadSlot,
     playlistItem,
+    initialPlayDelayMs,
   ]);
 
   useEffect(() => {

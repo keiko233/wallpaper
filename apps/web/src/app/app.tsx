@@ -4,11 +4,13 @@ import {
 } from "../db";
 import { createPlayerPersistence } from "../db/player-persistence";
 import Player from "@wallpaper/player";
+import { LoadingScreen } from "@wallpaper/player/loading-screen";
 import { m, useLocale } from "@wallpaper/i18n";
 import {
   AlertCircle,
   Library,
 } from "lucide-react";
+import { AnimatePresence, motion as Motion } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -51,6 +53,14 @@ const EMPTY_BUNDLED_RESOURCES: BundledPlayerResources = {
   stages: [],
 };
 
+// The reveal transition takes APP_REVEAL_DURATION_MS to complete; the initial
+// MMD playback waits a little longer so the render loop never starts while the
+// transition is still animating.
+const APP_REVEAL_DURATION_MS = 600;
+const APP_REVEAL_PLAY_BUFFER_MS = 400;
+const INITIAL_PLAY_DELAY_MS =
+  APP_REVEAL_DURATION_MS + APP_REVEAL_PLAY_BUFFER_MS;
+
 export default function WallpaperClientApp({
   bundledResources = EMPTY_BUNDLED_RESOURCES,
   defaultSourceUrl,
@@ -71,6 +81,7 @@ export default function WallpaperClientApp({
   const [materializeError, setMaterializeError] = useState<
     string | null
   >(null);
+  const [isLibraryReady, setIsLibraryReady] = useState(false);
   const [eulaDecision, setEulaDecision] = useLocalStorage<EulaDecision>(
     EULA_STORAGE_KEY,
     "pending",
@@ -109,6 +120,7 @@ export default function WallpaperClientApp({
         current = next;
         setMaterialized(next);
         setMaterializeError(null);
+        setIsLibraryReady(true);
       })
       .catch((error: unknown) => {
         if (active) {
@@ -145,24 +157,49 @@ export default function WallpaperClientApp({
     setEulaDecision("declined");
   }, [setEulaDecision]);
 
+  // Keep the main application (and its WebGL scene) unloaded until the EULA is
+  // accepted and the local library has finished materializing. The loading
+  // screen covers the async IndexedDB gap in the meantime.
+  const eulaSatisfied =
+    defaultSourceUrl === null || eulaDecision !== "pending";
+  const ready =
+    (isLibraryReady || materializeError !== null) && eulaSatisfied;
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-transparent">
-      <Player
-        emptyState={<EmptyLibrary />}
-        models={materialized.models}
-        motions={materialized.motions}
-        persistence={persistence}
-        settingsContent={
-          <ResourceLibrary
-            client={client}
-            onLibraryChanged={() =>
-              setLibraryRevision((revision) => revision + 1)
+      <AnimatePresence>
+        {ready ? null : <LoadingScreen key="loading-screen" />}
+      </AnimatePresence>
+
+      {ready ? (
+        <Motion.div
+          animate={{ opacity: 1, scale: 1 }}
+          className="min-h-dvh"
+          initial={{ opacity: 0, scale: 0.985 }}
+          transition={{
+            duration: APP_REVEAL_DURATION_MS / 1_000,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+        >
+          <Player
+            emptyState={<EmptyLibrary />}
+            initialPlayDelayMs={INITIAL_PLAY_DELAY_MS}
+            models={materialized.models}
+            motions={materialized.motions}
+            persistence={persistence}
+            settingsContent={
+              <ResourceLibrary
+                client={client}
+                onLibraryChanged={() =>
+                  setLibraryRevision((revision) => revision + 1)
+                }
+              />
             }
+            skyboxes={materialized.skyboxes}
+            stages={materialized.stages}
           />
-        }
-        skyboxes={materialized.skyboxes}
-        stages={materialized.stages}
-      />
+        </Motion.div>
+      ) : null}
 
       {defaultSourceUrl !== null &&
       eulaDecision === "pending" ? (
