@@ -1,4 +1,5 @@
 import { Settings2 } from "lucide-react";
+import { m } from "@wallpaper/i18n";
 import { Button } from "@wallpaper/ui/button";
 import {
   Sheet,
@@ -56,7 +57,7 @@ export default function App({
       <Sheet>
         {emptyState ?? (
           <section className="grid h-dvh w-full place-items-center bg-transparent p-6 text-center text-muted-foreground">
-            Add a model, motion, stage, and skybox option to begin.
+            {m.player_add_resources_prompt()}
           </section>
         )}
         <div className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--desktop-safe-area-bottom,0px)+0.75rem)] z-20 flex justify-center px-3">
@@ -70,20 +71,20 @@ export default function App({
             }
           >
             <Settings2 />
-            Player setup
+            {m.player_setup()}
           </SheetTrigger>
         </div>
         <SheetPopup className="bg-popover/82 backdrop-blur-2xl">
           <SheetHeader>
-            <SheetTitle>Player setup</SheetTitle>
+            <SheetTitle>{m.player_setup()}</SheetTitle>
             <SheetDescription>
-              Add resources before configuring playback and visuals.
+              {m.player_setup_description()}
             </SheetDescription>
           </SheetHeader>
           <SheetPanel>
             {settingsContent ?? (
               <p className="text-sm text-muted-foreground">
-                No resource manager is available.
+                {m.player_no_resource_manager()}
               </p>
             )}
           </SheetPanel>

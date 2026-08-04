@@ -17,6 +17,7 @@
     "@babylonjs/inspector": "^9.17.0",
     "@babylonjs/materials": "^9.17.0",
     "@wallpaper/ammo-wasm": "workspace:*",
+    "@wallpaper/i18n": "workspace:*",
     "@wallpaper/mme-fx": "workspace:*",
     "@wallpaper/ui": "workspace:*",
     "babylon-mmd": "^1.2.0",

@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
@@ -23,6 +24,11 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   plugins: [
+    paraglideVitePlugin({
+      project: resolve(workspaceRoot, "packages/i18n/project.inlang"),
+      outdir: resolve(workspaceRoot, "packages/i18n/src/paraglide"),
+      strategy: ["localStorage", "preferredLanguage", "baseLocale"],
+    }),
     tailwindcss(),
     react(),
     babel({

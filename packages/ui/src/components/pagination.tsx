@@ -8,6 +8,7 @@ import {
   MoreHorizontalIcon,
 } from "lucide-react";
 import type * as React from "react";
+import { m } from "@wallpaper/i18n";
 import { cn } from "@wallpaper/ui/utils";
 import { type Button, buttonVariants } from "@wallpaper/ui/button";
 
@@ -17,7 +18,7 @@ export function Pagination({
 }: React.ComponentProps<"nav">): React.ReactElement {
   return (
     <nav
-      aria-label="pagination"
+      aria-label={m.ui_pagination()}
       className={cn("mx-auto flex w-full justify-center", className)}
       data-slot="pagination"
       {...props}
@@ -84,13 +85,13 @@ export function PaginationPrevious({
 }: React.ComponentProps<typeof PaginationLink>): React.ReactElement {
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label={m.ui_previous_page()}
       className={cn("max-sm:aspect-square max-sm:p-0", className)}
       size="default"
       {...props}
     >
       <ChevronLeftIcon className="sm:-ms-1" />
-      <span className="max-sm:hidden">Previous</span>
+      <span className="max-sm:hidden">{m.common_previous()}</span>
     </PaginationLink>
   );
 }
@@ -101,12 +102,12 @@ export function PaginationNext({
 }: React.ComponentProps<typeof PaginationLink>): React.ReactElement {
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label={m.ui_next_page()}
       className={cn("max-sm:aspect-square max-sm:p-0", className)}
       size="default"
       {...props}
     >
-      <span className="max-sm:hidden">Next</span>
+      <span className="max-sm:hidden">{m.common_next()}</span>
       <ChevronRightIcon className="sm:-me-1" />
     </PaginationLink>
   );

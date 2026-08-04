@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion as Motion, useReducedMotion } from "motion/react";
+import { m } from "@wallpaper/i18n";
 import { Button } from "@wallpaper/ui/button";
 import { SheetTrigger } from "@wallpaper/ui/sheet";
 import { cn } from "@wallpaper/ui/utils";
@@ -26,10 +27,10 @@ const ISLAND_TRANSITION = {
 } as const;
 
 const STATUS_TEXT = {
-  idle: "Waiting",
-  loading: "Loading",
-  ready: "Playing",
-  error: "Load failed",
+  idle: () => m.player_status_waiting(),
+  loading: () => m.player_status_loading(),
+  ready: () => m.player_status_playing(),
+  error: () => m.player_status_load_failed(),
 } as const;
 
 export function PlaybackControls() {
@@ -103,11 +104,11 @@ export function PlaybackControls() {
   const statusText =
     status === "ready"
       ? !isPlaying
-        ? "Paused"
+        ? m.player_status_paused()
         : isPreloading
-          ? "Preparing next"
-          : STATUS_TEXT.ready
-      : STATUS_TEXT[status];
+          ? m.player_status_preparing_next()
+          : STATUS_TEXT.ready()
+      : STATUS_TEXT[status]();
 
   return (
     <Motion.div
@@ -247,30 +248,34 @@ export function PlaybackControls() {
                 </span>
               </div>
               <span className="sr-only">
-                Model: {model.name}. Stage: {stage.name}. Skybox: {skybox.name}.
+                {m.player_sr_only_combination({
+                  model: model.name,
+                  stage: stage.name,
+                  skybox: skybox.name,
+                })}
               </span>
             </div>
 
             <div className="hidden h-7 w-px bg-border sm:block" />
 
             <Button
-              aria-label="Previous playlist item"
+              aria-label={m.player_previous_playlist_item()}
               disabled={!hasMultipleItems}
               onClick={previousPlaylistItem}
               size="icon"
-              title="Previous"
+              title={m.common_previous()}
               variant="ghost"
             >
               <SkipBack />
             </Button>
 
             <Button
-              aria-label={isPlaying ? "Pause playback" : "Play"}
+              aria-label={isPlaying ? m.player_pause_playback() : m.player_play()}
               className="rounded-xl"
               disabled={!canControlPlayback}
               onClick={() => void togglePlayback()}
               size="icon-lg"
-              title={isPlaying ? "Pause" : "Play"}
+              title={isPlaying ? m.player_pause() : m.player_play()}
             >
               {isLoading && !isPlaying ? (
                 <LoaderCircle className="animate-spin" />
@@ -282,11 +287,11 @@ export function PlaybackControls() {
             </Button>
 
             <Button
-              aria-label="Next playlist item"
+              aria-label={m.player_next_playlist_item()}
               disabled={!hasMultipleItems}
               onClick={nextPlaylistItem}
               size="icon"
-              title="Next"
+              title={m.common_next()}
               variant="ghost"
             >
               <SkipForward />
@@ -296,12 +301,14 @@ export function PlaybackControls() {
 
             <Button
               aria-label={
-                status === "error" ? "Retry loading" : "Reload current item"
+                status === "error"
+                  ? m.player_retry_loading()
+                  : m.player_reload_current_item()
               }
               disabled={isLoading || status === "idle"}
               onClick={reload}
               size="icon"
-              title={status === "error" ? "Retry" : "Reload"}
+              title={status === "error" ? m.player_retry() : m.player_reload()}
               variant={status === "error" ? "destructive-outline" : "ghost"}
             >
               {status === "error" ? (
@@ -312,8 +319,10 @@ export function PlaybackControls() {
             </Button>
 
             <SheetTrigger
-              aria-label="Open MMD settings"
-              render={<Button size="icon" title="Settings" variant="ghost" />}
+              aria-label={m.player_open_mmd_settings()}
+              render={
+                <Button size="icon" title={m.player_settings()} variant="ghost" />
+              }
             >
               <Settings2 />
             </SheetTrigger>

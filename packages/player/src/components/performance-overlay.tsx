@@ -1,4 +1,5 @@
 import { GripHorizontal } from "lucide-react";
+import { m } from "@wallpaper/i18n";
 import { useCallback, useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useKey, useLocalStorage } from "react-use";
@@ -178,12 +179,12 @@ export function PerformanceOverlay({
   const gpuLabel =
     snapshot.gpu !== null && snapshot.gpu.renderer.length > 0
       ? snapshot.gpu.renderer
-      : "Unknown GPU";
+      : m.player_overlay_gpu_unknown();
   const accentColor = frameTimeColor(snapshot.frameTimeMs);
 
   return (
     <div
-      aria-label="Live rendering performance"
+      aria-label={m.player_overlay_region_label()}
       ref={containerRef}
       className="group pointer-events-auto absolute z-30 w-60 select-none font-mono text-white [text-shadow:1px_1px_0_#000]"
       role="region"
@@ -191,13 +192,13 @@ export function PerformanceOverlay({
     >
       <div className="relative contain-paint rounded-lg border border-transparent bg-transparent transition-colors duration-150 group-hover:border-white/10 group-hover:bg-[#0b0d10]/90">
         <div
-          aria-label="Drag performance overlay"
+          aria-label={m.player_overlay_drag_label()}
           className="pointer-events-none absolute -top-2 left-1/2 z-10 flex h-4 w-8 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-[#0b0d10] opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 active:cursor-grabbing"
           onPointerCancel={handlePointerUp}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          title="Drag to reposition"
+          title={m.player_overlay_drag_title()}
         >
           <GripHorizontal
             aria-hidden
@@ -215,28 +216,28 @@ export function PerformanceOverlay({
                 {formatFps(snapshot.fps)}
               </span>
               <span className="text-[9px] font-semibold uppercase tracking-wider text-white/45">
-                FPS
+                {m.player_overlay_fps()}
               </span>
             </div>
             <div className="pb-0.5 text-right text-[11px] font-semibold leading-none tabular-nums text-white/75">
               {snapshot.frameTimeMs.toFixed(1)}
               <span className="ml-1 text-[8px] font-normal uppercase text-white/35">
-                ms
+                {m.player_overlay_ms()}
               </span>
             </div>
           </div>
 
           <div className="mt-1.5 flex items-center gap-3 text-[9px] leading-none tabular-nums text-white/55">
             <span>
-              <span className="text-white/30">AVG</span>{" "}
+              <span className="text-white/30">{m.player_overlay_avg()}</span>{" "}
               {formatFps(snapshot.averageFps)}
             </span>
             <span>
-              <span className="text-white/30">1% LOW</span>{" "}
+              <span className="text-white/30">{m.player_overlay_low1()}</span>{" "}
               {formatFps(snapshot.low1PercentFps)}
             </span>
             <span>
-              <span className="text-white/30">0.1%</span>{" "}
+              <span className="text-white/30">{m.player_overlay_low01()}</span>{" "}
               {formatFps(snapshot.low0_1PercentFps)}
             </span>
           </div>
@@ -249,13 +250,13 @@ export function PerformanceOverlay({
           <div className="mt-1.5 flex items-center gap-1.5 text-[8px] leading-none tabular-nums text-white/40">
             <span>
               {snapshot.resolution === null
-                ? "Unknown"
+                ? m.player_overlay_unknown()
                 : `${snapshot.resolution.width}×${snapshot.resolution.height}`}
             </span>
             <span className="text-white/20">·</span>
-            <span>{snapshot.drawCalls} draws</span>
+            <span>{m.player_overlay_draws({ count: snapshot.drawCalls })}</span>
             <span className="text-white/20">·</span>
-            <span>{snapshot.activeMeshes} meshes</span>
+            <span>{m.player_overlay_meshes({ count: snapshot.activeMeshes })}</span>
           </div>
         </div>
       </div>
@@ -354,7 +355,7 @@ function FrameTimeGraph({ snapshot }: { snapshot: PerformanceSnapshot }) {
   return (
     <div className="mt-1.5">
       <div className="mb-1 flex items-center justify-between text-[7px] uppercase tracking-[0.1em] text-white/25">
-        <span>Frame history</span>
+        <span>{m.player_overlay_frame_history()}</span>
         <span className="tabular-nums">0–{snapshot.graphMaxMs.toFixed(1)} ms</span>
       </div>
       <div

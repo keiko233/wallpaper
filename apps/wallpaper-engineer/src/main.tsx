@@ -1,4 +1,5 @@
 import WallpaperClientApp from "./app/app";
+import { initI18n } from "@wallpaper/i18n";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { initializeDesktopSafeArea } from "./lib/desktop-safe-area";
@@ -9,6 +10,7 @@ import {
   WALLPAPER_ENGINE_BUNDLED_RESOURCES,
 } from "./config";
 
+initI18n();
 initializeUiScale();
 initializeDesktopSafeArea();
 

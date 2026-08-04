@@ -1,3 +1,4 @@
+import { getLocale, m } from "@wallpaper/i18n";
 import type { ResourceKind } from "@wallpaper/resource-schema";
 import type { ResourceSourceRecord } from "../db";
 import {
@@ -77,14 +78,14 @@ import type {
   InstalledResourceSummary,
 } from "./resource-client";
 
-const kinds: { label: string; value: ResourceKind | "all" }[] = [
-  { label: "All kinds", value: "all" },
-  { label: "Models", value: "model" },
-  { label: "Motions", value: "motion" },
-  { label: "Audio", value: "audio" },
-  { label: "Stages", value: "stage" },
-  { label: "Skyboxes", value: "skybox" },
-  { label: "Videos", value: "video" },
+const kinds: { label: () => string; value: ResourceKind | "all" }[] = [
+  { label: () => m.library_kind_all(), value: "all" },
+  { label: () => m.library_kind_model(), value: "model" },
+  { label: () => m.library_kind_motion(), value: "motion" },
+  { label: () => m.library_kind_audio(), value: "audio" },
+  { label: () => m.library_kind_stage(), value: "stage" },
+  { label: () => m.library_kind_skybox(), value: "skybox" },
+  { label: () => m.library_kind_video(), value: "video" },
 ];
 
 const kindIcons = {
@@ -107,19 +108,19 @@ const statusVariants = {
 function getProgressLabel(progress: InstallProgress): string {
   switch (progress.phase) {
     case "catalog":
-      return "Preparing catalog resource";
+      return m.library_progress_catalog();
     case "downloading":
-      return "Downloading artifact";
+      return m.library_progress_downloading();
     case "verifying":
-      return "Verifying SHA-256";
+      return m.library_progress_verifying();
     case "extracting":
-      return "Preparing local files";
+      return m.library_progress_extracting();
   }
 }
 
 function formatTimestamp(value: string | null): string {
-  if (value === null) return "Never";
-  return new Intl.DateTimeFormat(undefined, {
+  if (value === null) return m.library_never();
+  return new Intl.DateTimeFormat(getLocale(), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
@@ -150,7 +151,7 @@ function ResourceCover({ resource }: { resource: ResourceCardData }) {
   const Icon = kindIcons[resource.kind];
   return (
     <div
-      aria-label={`${resource.kind} placeholder cover`}
+      aria-label={m.library_placeholder_cover({ kind: resource.kind })}
       className="grid aspect-video w-full place-items-center rounded-lg border bg-muted/60 text-muted-foreground sm:w-36"
       role="img"
     >
@@ -186,10 +187,10 @@ function ResourceCard({
                 {resource.sourceName}
               </Badge>
               {sourceAvailable ? null : (
-                <Badge variant="secondary">Source removed</Badge>
+                <Badge variant="secondary">{m.library_source_removed()}</Badge>
               )}
               {sourceIsDefault ? (
-                <Badge variant="secondary">Default</Badge>
+                <Badge variant="secondary">{m.library_default()}</Badge>
               ) : null}
             </div>
             {resource.description === null ? null : (
@@ -529,14 +530,13 @@ export function ResourceLibrary({
           }
         >
           <Library />
-          Resources
+          {m.library_resources()}
         </DialogTrigger>
         <DialogPopup className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Resource library</DialogTitle>
+            <DialogTitle>{m.library_title()}</DialogTitle>
             <DialogDescription>
-              Browse independent resource sources and manage artifacts
-              installed on this device.
+              {m.library_description()}
             </DialogDescription>
           </DialogHeader>
           <DialogPanel>
@@ -551,18 +551,18 @@ export function ResourceLibrary({
               <TabsList>
                 <TabsTab value="browse">
                   <Search />
-                  Browse
+                  {m.library_tab_browse()}
                 </TabsTab>
                 <TabsTab value="installed">
                   <Check />
-                  Installed
+                  {m.library_tab_installed()}
                   <Badge size="sm" variant="secondary">
                     {installedResources.length}
                   </Badge>
                 </TabsTab>
                 <TabsTab value="sources">
                   <Server />
-                  Sources
+                  {m.library_tab_sources()}
                   <Badge size="sm" variant="secondary">
                     {sources.length}
                   </Badge>
@@ -575,9 +575,9 @@ export function ResourceLibrary({
                   onSubmit={(event) => void submit(event)}
                 >
                   <Input
-                    aria-label="Search resources"
+                    aria-label={m.library_search_label()}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Search models, motions, stages, skyboxes…"
+                    placeholder={m.library_search_placeholder()}
                     type="search"
                     value={query}
                   />
@@ -587,27 +587,27 @@ export function ResourceLibrary({
                     }}
                     value={kind}
                   >
-                    <SelectTrigger aria-label="Resource kind">
+                    <SelectTrigger aria-label={m.library_kind_label()}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectPopup>
                       {kinds.map((item) => (
                         <SelectItem key={item.value} value={item.value}>
-                          {item.label}
+                          {item.label()}
                         </SelectItem>
                       ))}
                     </SelectPopup>
                   </Select>
                   <Button loading={isSearching} type="submit">
                     <Search />
-                    Search
+                    {m.library_search()}
                   </Button>
                 </form>
 
                 {browseError === null ? null : (
                   <Alert variant="error">
                     <AlertCircle />
-                    <AlertTitle>Resource request failed</AlertTitle>
+                    <AlertTitle>{m.library_request_failed()}</AlertTitle>
                     <AlertDescription>{browseError}</AlertDescription>
                   </Alert>
                 )}
@@ -623,7 +623,7 @@ export function ResourceLibrary({
                     >
                       <AlertCircle />
                       <AlertTitle>
-                        {source.sourceName} is {source.status}
+                        {m.library_source_is_status({ sourceName: source.sourceName, status: source.status })}
                       </AlertTitle>
                       <AlertDescription>{source.error}</AlertDescription>
                     </Alert>
@@ -635,12 +635,10 @@ export function ResourceLibrary({
                       <Server className="mx-auto size-8 text-muted-foreground" />
                       <div>
                         <h3 className="font-medium">
-                          Add a resource source to get started
+                          {m.library_empty_title()}
                         </h3>
                         <p className="mt-1 text-muted-foreground text-sm">
-                          A source can be an R2 public domain, an nginx
-                          directory, or any HTTPS URL containing
-                          catalog.json.
+                          {m.library_empty_description()}
                         </p>
                       </div>
                       <div className="flex flex-wrap justify-center gap-2">
@@ -650,7 +648,7 @@ export function ResourceLibrary({
                             variant="outline"
                           >
                             <Check />
-                            View installed resources
+                            {m.library_view_installed()}
                           </Button>
                         )}
                         <Button
@@ -658,7 +656,7 @@ export function ResourceLibrary({
                           variant="outline"
                         >
                           <Plus />
-                          Add source
+                          {m.library_add_source()}
                         </Button>
                       </div>
                     </div>
@@ -667,7 +665,7 @@ export function ResourceLibrary({
                   <div className="max-h-[55dvh] space-y-2 overflow-y-auto pe-1">
                     {result?.items.length === 0 ? (
                       <p className="py-10 text-center text-muted-foreground text-sm">
-                        No resources from enabled sources match this search.
+                        {m.library_no_search_results()}
                       </p>
                     ) : null}
                     {result?.items.map((item) => {
@@ -686,7 +684,7 @@ export function ResourceLibrary({
                               <>
                                 <Button disabled size="sm" variant="outline">
                                   <Check />
-                                  Installed
+                                  {m.library_installed()}
                                 </Button>
                                 <Button
                                   disabled={deletingResourceId !== null}
@@ -700,7 +698,7 @@ export function ResourceLibrary({
                                   variant="destructive-outline"
                                 >
                                   <Trash2 />
-                                  Delete
+                                  {m.library_delete()}
                                 </Button>
                               </>
                             ) : (
@@ -711,7 +709,7 @@ export function ResourceLibrary({
                                 size="sm"
                               >
                                 <Download />
-                                Add
+                                {m.library_add()}
                               </Button>
                             )
                           }
@@ -750,7 +748,7 @@ export function ResourceLibrary({
                     onClick={() => void search(result.nextCursor!)}
                     variant="outline"
                   >
-                    Load more
+                    {m.library_load_more()}
                   </Button>
                 )}
               </TabsPanel>
@@ -759,7 +757,7 @@ export function ResourceLibrary({
                 {browseError === null ? null : (
                   <Alert variant="error">
                     <AlertCircle />
-                    <AlertTitle>Resource operation failed</AlertTitle>
+                    <AlertTitle>{m.library_operation_failed()}</AlertTitle>
                     <AlertDescription>{browseError}</AlertDescription>
                   </Alert>
                 )}
@@ -767,9 +765,8 @@ export function ResourceLibrary({
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card/55 p-3 shadow-sm backdrop-blur-xl">
                     <p className="text-muted-foreground text-sm">
                       {updates.size === 1
-                        ? "1 update available"
-                        : `${updates.size} updates available`}{" "}
-                      — versions are refreshed from the catalog.
+                        ? m.library_one_update_available()
+                        : m.library_updates_available({ count: updates.size })}
                     </p>
                     <Button
                       disabled={installing !== null}
@@ -777,14 +774,14 @@ export function ResourceLibrary({
                       size="sm"
                     >
                       <RefreshCw />
-                      Update all
+                      {m.library_update_all()}
                     </Button>
                   </div>
                 )}
                 <div className="max-h-[55dvh] space-y-2 overflow-y-auto pe-1">
                   {installedResources.length === 0 ? (
                     <p className="rounded-xl border border-dashed py-10 text-center text-muted-foreground text-sm">
-                      No resources are installed on this device.
+                      {m.library_none_installed()}
                     </p>
                   ) : null}
                   {installedResources.map((item) => {
@@ -808,7 +805,7 @@ export function ResourceLibrary({
                                 variant="outline"
                               >
                                 <RefreshCw />
-                                Update
+                                {m.library_update()}
                               </Button>
                             )}
                             <Button
@@ -832,16 +829,15 @@ export function ResourceLibrary({
                         sourceAvailable={item.sourceAvailable}
                       >
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>Version {item.version}</span>
+                          <span>{m.library_version({ version: item.version })}</span>
                           {update === undefined ? null : (
                             <Badge variant="info">
                               <RefreshCw />
-                              Update available: v{item.version} → v
-                              {update.update.version}
+                              {m.library_update_badge({ current: item.version, next: update.update.version })}
                             </Badge>
                           )}
                           {item.ready ? null : (
-                            <Badge variant="warning">Incomplete</Badge>
+                            <Badge variant="warning">{m.library_incomplete()}</Badge>
                           )}
                         </div>
                         {progress === null ? null : (
@@ -874,7 +870,7 @@ export function ResourceLibrary({
                 >
                   <div className="space-y-1.5">
                     <Label htmlFor="resource-source-url">
-                      Resource source URL
+                      {m.library_source_url_label()}
                     </Label>
                     <Input
                       id="resource-source-url"
@@ -886,8 +882,7 @@ export function ResourceLibrary({
                       value={sourceInput}
                     />
                     <p className="text-muted-foreground text-xs">
-                      Root URLs, subpaths, and direct catalog.json URLs
-                      are supported. The host must allow browser CORS.
+                      {m.library_source_url_description()}
                     </p>
                   </div>
                   <Button
@@ -896,14 +891,14 @@ export function ResourceLibrary({
                     type="submit"
                   >
                     <Plus />
-                    Add source
+                    {m.library_add_source()}
                   </Button>
                 </form>
 
                 {sourceError === null ? null : (
                   <Alert variant="error">
                     <AlertCircle />
-                    <AlertTitle>Source operation failed</AlertTitle>
+                    <AlertTitle>{m.library_source_operation_failed()}</AlertTitle>
                     <AlertDescription>{sourceError}</AlertDescription>
                   </Alert>
                 )}
@@ -911,7 +906,7 @@ export function ResourceLibrary({
                 <div className="max-h-[50dvh] space-y-2 overflow-y-auto pe-1">
                   {sources.length === 0 ? (
                     <p className="rounded-xl border border-dashed py-10 text-center text-muted-foreground text-sm">
-                      No resource sources configured.
+                      {m.library_no_sources_configured()}
                     </p>
                   ) : null}
                   {sources.map((source) => (
@@ -949,7 +944,7 @@ export function ResourceLibrary({
                             className="text-muted-foreground"
                             htmlFor={`source-enabled-${source.id}`}
                           >
-                            Enabled
+                            {m.library_enabled()}
                           </Label>
                           <Switch
                             checked={source.enabled}
@@ -975,7 +970,7 @@ export function ResourceLibrary({
                               : "warning"
                           }
                         >
-                          <AlertTitle>Last refresh failed</AlertTitle>
+                          <AlertTitle>{m.library_last_refresh_failed()}</AlertTitle>
                           <AlertDescription>
                             {source.lastError}
                           </AlertDescription>
@@ -985,15 +980,15 @@ export function ResourceLibrary({
                       <dl className="grid gap-2 text-xs sm:grid-cols-2">
                         <div>
                           <dt className="text-muted-foreground">
-                            Revision
+                            {m.library_revision()}
                           </dt>
                           <dd className="truncate font-mono">
-                            {source.revision ?? "Not fetched"}
+                            {source.revision ?? m.library_not_fetched()}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-muted-foreground">
-                            Last successful refresh
+                            {m.library_last_successful_refresh()}
                           </dt>
                           <dd>
                             {formatTimestamp(source.lastSuccessfulAt)}
@@ -1009,7 +1004,7 @@ export function ResourceLibrary({
                           variant="outline"
                         >
                           <RefreshCw />
-                          Refresh
+                          {m.library_refresh()}
                         </Button>
                         <Button
                           disabled={sourceBusy !== null}
@@ -1018,7 +1013,7 @@ export function ResourceLibrary({
                           variant="destructive-outline"
                         >
                           <Trash2 />
-                          Remove
+                          {m.library_remove()}
                         </Button>
                       </div>
                     </div>
@@ -1039,33 +1034,31 @@ export function ResourceLibrary({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Remove {sourceToRemove?.name ?? "resource source"}?
+              {m.library_remove_source_title({ name: sourceToRemove?.name ?? "resource source" })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Choose whether resources already installed from this source
-              should remain available on this device. Both options remove
-              the source and its cached catalog.
+              {m.library_remove_source_description()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:flex-wrap">
             <AlertDialogClose
               render={<Button disabled={sourceBusy !== null} variant="ghost" />}
             >
-              Cancel
+              {m.library_cancel()}
             </AlertDialogClose>
             <Button
               disabled={sourceBusy !== null}
               onClick={() => void removeSource("keep-installed")}
               variant="outline"
             >
-              Keep installed resources
+              {m.library_keep_installed_resources()}
             </Button>
             <Button
               loading={sourceBusy === sourceToRemove?.id}
               onClick={() => void removeSource("delete-installed")}
               variant="destructive"
             >
-              Delete installed resources
+              {m.library_delete_installed_resources()}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>
@@ -1082,12 +1075,10 @@ export function ResourceLibrary({
         <AlertDialogPopup>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Delete {resourceToDelete?.name ?? "installed resource"}?
+              {m.library_delete_resource_title({ name: resourceToDelete?.name ?? "installed resource" })}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the resource from the player and deletes its local
-              files when they are not shared by another installed resource.
-              The resource source remains configured.
+              {m.library_delete_resource_description()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1107,7 +1098,7 @@ export function ResourceLibrary({
               variant="destructive"
             >
               <Trash2 />
-              Delete resource
+              {m.library_delete_resource()}
             </Button>
           </AlertDialogFooter>
         </AlertDialogPopup>

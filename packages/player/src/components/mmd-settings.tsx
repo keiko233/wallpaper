@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { m } from "@wallpaper/i18n";
 import { Button } from "@wallpaper/ui/button";
 import { Kbd } from "@wallpaper/ui/kbd";
 import { Label } from "@wallpaper/ui/label";
@@ -25,6 +26,7 @@ import {
   useMmdState,
 } from "../providers/mmd-context";
 import { GroupedSelectItems } from "./grouped-select-items";
+import { LocaleSwitcher } from "./locale-switcher";
 import { PlaylistEditor } from "./playlist-editor";
 import {
   SheetDescription,
@@ -45,18 +47,24 @@ import {
 } from "../types";
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
-const MATERIAL_RENDER_MODE_LABELS = {
-  mmd: "MMD accurate",
-  balanced: "Balanced",
-  performance: "Performance",
-} as const;
+const MATERIAL_RENDER_MODE_LABELS: Record<
+  "mmd" | "balanced" | "performance",
+  () => string
+> = {
+  mmd: () => m.player_settings_render_mode_mmd(),
+  balanced: () => m.player_settings_render_mode_balanced(),
+  performance: () => m.player_settings_render_mode_performance(),
+};
 
-const QUALITY_PRESET_LABELS: Record<MmdQualityPreset | "custom", string> = {
-  performance: "Performance",
-  balanced: "Balanced",
-  quality: "High quality",
-  ultra: "Ultra",
-  custom: "Custom",
+const QUALITY_PRESET_LABELS: Record<
+  MmdQualityPreset | "custom",
+  () => string
+> = {
+  performance: () => m.player_settings_quality_preset_performance(),
+  balanced: () => m.player_settings_quality_preset_balanced(),
+  quality: () => m.player_settings_quality_preset_high_quality(),
+  ultra: () => m.player_settings_quality_preset_ultra(),
+  custom: () => m.player_settings_quality_preset_custom(),
 };
 
 const MSAA_OPTIONS = [1, 2, 4, 8] as const;
@@ -70,17 +78,17 @@ const PLANAR_REFLECTION_TEXTURE_SIZE_OPTIONS = [
   1_024,
   2_048,
 ] as const;
-const SSR_QUALITY_LABELS = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-} as const;
+const SSR_QUALITY_LABELS: Record<"low" | "medium" | "high", () => string> = {
+  low: () => m.player_settings_quality_low(),
+  medium: () => m.player_settings_quality_medium(),
+  high: () => m.player_settings_quality_high(),
+};
 
 const STATUS_LABELS = {
-  idle: "Waiting for canvas",
-  loading: "Loading resources",
-  ready: "Ready",
-  error: "Load failed",
+  idle: () => m.player_status_waiting_for_canvas(),
+  loading: () => m.player_status_loading_resources(),
+  ready: () => m.player_status_ready(),
+  error: () => m.player_status_load_failed(),
 } as const;
 
 function SettingHeading({ title, value }: { title: string; value?: string }) {
@@ -206,7 +214,7 @@ function LivePerformanceReadout() {
   if (snapshot === null || snapshot.frameCount === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        Waiting for the first rendered frames…
+        {m.player_settings_waiting_for_frames()}
       </p>
     );
   }
@@ -215,16 +223,16 @@ function LivePerformanceReadout() {
     <div className="space-y-1.5 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 font-mono">
       <div className="flex items-baseline justify-between">
         <span className="text-lg font-bold leading-none tabular-nums text-[#7CFC00]">
-          {formatOverlayFps(snapshot.fps)} FPS
+          {formatOverlayFps(snapshot.fps)} {m.player_settings_fps()}
         </span>
         <span className="text-xs leading-none tabular-nums text-muted-foreground">
-          {snapshot.frameTimeMs.toFixed(1)} ms
+          {snapshot.frameTimeMs.toFixed(1)} {m.player_settings_ms()}
         </span>
       </div>
       <div className="flex justify-between text-[11px] leading-none tabular-nums text-muted-foreground">
-        <span>avg {formatOverlayFps(snapshot.averageFps)}</span>
-        <span>1% low {formatOverlayFps(snapshot.low1PercentFps)}</span>
-        <span>{snapshot.drawCalls} draws</span>
+        <span>{m.player_settings_avg_fps({ value: formatOverlayFps(snapshot.averageFps) })}</span>
+        <span>{m.player_settings_low1_percent_fps({ value: formatOverlayFps(snapshot.low1PercentFps) })}</span>
+        <span>{m.player_settings_draws_count({ count: snapshot.drawCalls })}</span>
       </div>
     </div>
   );
@@ -252,7 +260,7 @@ function ResourceSelector({
       <Label>{label}</Label>
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2">
         <Button
-          aria-label={`Previous ${label.toLowerCase()}`}
+          aria-label={m.player_settings_previous_resource({ label })}
           disabled={!hasMultipleItems}
           onClick={onPrevious}
           size="icon"
@@ -279,7 +287,7 @@ function ResourceSelector({
         </Select>
 
         <Button
-          aria-label={`Next ${label.toLowerCase()}`}
+          aria-label={m.player_settings_next_resource({ label })}
           disabled={!hasMultipleItems}
           onClick={onNext}
           size="icon"
@@ -364,7 +372,7 @@ export function MmdSettings({
   return (
     <SheetPopup className="bg-popover/82 backdrop-blur-2xl">
       <SheetHeader className="border-b border-border/60 bg-card/20">
-        <SheetTitle>Player settings</SheetTitle>
+        <SheetTitle>{m.player_settings_title()}</SheetTitle>
         <SheetDescription className="truncate pe-8">
           {model.name} · {motion.name}
         </SheetDescription>
@@ -391,31 +399,35 @@ export function MmdSettings({
           <span>
             {error?.message ??
               (status === "ready" && isPreloading
-                ? "Ready · preparing next item"
-                : STATUS_LABELS[status])}
+                ? m.player_settings_ready_preparing_next()
+                : STATUS_LABELS[status]())}
           </span>
         </div>
 
         <Tabs defaultValue="content">
           <TabsList className="grid w-full grid-cols-3 bg-muted/60 backdrop-blur-xl">
-            <TabsTab value="content">Content</TabsTab>
-            <TabsTab value="look">Look</TabsTab>
-            <TabsTab value="render">Render</TabsTab>
+            <TabsTab value="content">{m.player_settings_tab_content()}</TabsTab>
+            <TabsTab value="look">{m.player_settings_tab_look()}</TabsTab>
+            <TabsTab value="render">{m.player_settings_tab_render()}</TabsTab>
           </TabsList>
 
           <TabsPanel className="space-y-4 pt-2" value="content">
             {settingsContent === undefined ? null : (
               <SettingsGroup
-                description="Browse and manage resources cached on this device."
-                title="Library"
+                description={m.player_settings_library_description()}
+                title={m.player_settings_library()}
               >
                 {settingsContent}
               </SettingsGroup>
             )}
 
+        <section className="space-y-2 rounded-2xl border border-border/70 bg-card/40 p-4">
+          <LocaleSwitcher />
+        </section>
+
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading
-            title="Playlist"
+            title={m.player_settings_playlist()}
             value={`${playlistIndex + 1} / ${playlist.length}`}
           />
           <div className="rounded-xl border bg-muted/30 p-3">
@@ -434,7 +446,7 @@ export function MmdSettings({
             <div className="mt-3 flex items-center justify-between gap-2">
               <div className="flex gap-2">
                 <Button
-                  aria-label="Previous playlist item"
+                  aria-label={m.player_previous_playlist_item()}
                   disabled={playlist.length <= 1}
                   onClick={previousPlaylistItem}
                   size="icon-sm"
@@ -443,7 +455,7 @@ export function MmdSettings({
                   <ChevronLeft />
                 </Button>
                 <Button
-                  aria-label="Next playlist item"
+                  aria-label={m.player_next_playlist_item()}
                   disabled={playlist.length <= 1}
                   onClick={nextPlaylistItem}
                   size="icon-sm"
@@ -456,10 +468,10 @@ export function MmdSettings({
             </div>
           </div>
 
-          <SettingHeading title="Current combination" />
+          <SettingHeading title={m.player_settings_current_combination()} />
           <ResourceSelector
             items={models}
-            label="Model"
+            label={m.player_settings_model()}
             onChange={selectModel}
             onNext={nextModel}
             onPrevious={previousModel}
@@ -467,7 +479,7 @@ export function MmdSettings({
           />
           <ResourceSelector
             items={motions}
-            label="Motion"
+            label={m.player_settings_motion()}
             onChange={selectMotion}
             onNext={nextMotion}
             onPrevious={previousMotion}
@@ -475,7 +487,7 @@ export function MmdSettings({
           />
           <ResourceSelector
             items={stages}
-            label="Stage"
+            label={m.player_settings_stage()}
             onChange={selectStage}
             onNext={nextStage}
             onPrevious={previousStage}
@@ -483,7 +495,7 @@ export function MmdSettings({
           />
           <ResourceSelector
             items={skyboxes}
-            label="Skybox"
+            label={m.player_settings_skybox()}
             onChange={selectSkybox}
             onNext={nextSkybox}
             onPrevious={previousSkybox}
@@ -493,14 +505,14 @@ export function MmdSettings({
 
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div className="space-y-2">
-            <Label>Playback speed</Label>
+            <Label>{m.player_settings_playback_speed()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue !== null) setPlaybackRate(Number(nextValue));
               }}
               value={String(playbackRate)}
             >
-              <SelectTrigger aria-label="Playback speed">
+              <SelectTrigger aria-label={m.player_settings_playback_speed()}>
                 <SelectValue>{playbackRate}×</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -515,15 +527,15 @@ export function MmdSettings({
         </section>
 
         <section className="space-y-3 rounded-2xl border border-border/70 bg-card/40 p-4">
-          <SettingHeading title="Appearance" value={colorValue} />
+          <SettingHeading title={m.player_settings_appearance()} value={colorValue} />
           <Label className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-            Background color
+            {m.player_settings_background_color()}
             <span
               className="size-7 rounded-md border shadow-xs"
               style={{ backgroundColor: colorValue }}
             />
             <input
-              aria-label="Background color"
+              aria-label={m.player_settings_background_color()}
               className="sr-only"
               onChange={(event) => setBackground(event.currentTarget.value)}
               type="color"
@@ -535,9 +547,9 @@ export function MmdSettings({
 
           <TabsPanel className="space-y-4 pt-2" value="look">
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
-          <SettingHeading title="Lighting" />
+          <SettingHeading title={m.player_settings_lighting()} />
           <SettingSlider
-            label="Ambient light"
+            label={m.player_settings_ambient_light()}
             max={1}
             min={0}
             onChange={(value) =>
@@ -547,7 +559,7 @@ export function MmdSettings({
             value={renderSettings.ambientLightIntensity}
           />
           <SettingSlider
-            label="Fill light"
+            label={m.player_settings_fill_light()}
             max={1.5}
             min={0}
             onChange={(value) =>
@@ -557,7 +569,7 @@ export function MmdSettings({
             value={renderSettings.hemisphericLightIntensity}
           />
           <SettingSlider
-            label="Key light"
+            label={m.player_settings_key_light()}
             max={2}
             min={0}
             onChange={(value) =>
@@ -567,13 +579,13 @@ export function MmdSettings({
             value={renderSettings.directionalLightIntensity}
           />
           <Label className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-            Key light color
+            {m.player_settings_key_light_color()}
             <span
               className="size-7 rounded-md border shadow-xs"
               style={{ backgroundColor: renderSettings.directionalLightColor }}
             />
             <input
-              aria-label="Key light color"
+              aria-label={m.player_settings_key_light_color()}
               className="sr-only"
               onChange={(event) =>
                 setRenderSettings({
@@ -586,7 +598,7 @@ export function MmdSettings({
           </Label>
           <SettingSlider
             formatValue={(value) => `${Math.round(value * 100)}%`}
-            label="Shadow opacity"
+            label={m.player_settings_shadow_opacity()}
             max={1}
             min={0}
             onChange={(value) => setRenderSettings({ shadowOpacity: value })}
@@ -594,7 +606,7 @@ export function MmdSettings({
             value={renderSettings.shadowOpacity}
           />
           <SettingSlider
-            label="Exposure"
+            label={m.player_settings_exposure()}
             max={2}
             min={0.25}
             onChange={(value) => setRenderSettings({ exposure: value })}
@@ -602,7 +614,7 @@ export function MmdSettings({
             value={renderSettings.exposure}
           />
           <SettingSlider
-            label="Contrast"
+            label={m.player_settings_contrast()}
             max={2}
             min={0.5}
             onChange={(value) => setRenderSettings({ contrast: value })}
@@ -614,9 +626,9 @@ export function MmdSettings({
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <SettingHeading title="MME effects" />
+              <SettingHeading title={m.player_settings_mme_effects()} />
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Browser-native versions of common MME post effects.
+                {m.player_settings_mme_effects_description()}
               </p>
             </div>
             <Button
@@ -625,35 +637,35 @@ export function MmdSettings({
               variant="ghost"
             >
               <RotateCcw />
-              Reset
+              {m.player_settings_reset()}
             </Button>
           </div>
 
           <SettingSwitch
             checked={renderSettings.stageEffectsEnabled}
-            description="Applies the stage's built-in material, lighting, emissive, and bloom tuning."
-            label="Stage effects"
+            description={m.player_settings_stage_effects_description()}
+            label={m.player_settings_stage_effects()}
             onCheckedChange={(checked) =>
               setRenderSettings({ stageEffectsEnabled: checked })
             }
           />
           <p className="text-xs text-muted-foreground">
-            Changing this option reloads the current resources.
+            {m.player_settings_reload_on_change()}
           </p>
 
           {renderSettings.stageEffectsEnabled && (
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSwitch
                 checked={renderSettings.planarReflectionEnabled}
-                description="Renders stage-profile and WorkingFloor mirrors. This can be expensive on the GPU."
-                label="Planar reflections"
+                description={m.player_settings_planar_reflections_description()}
+                label={m.player_settings_planar_reflections()}
                 onCheckedChange={(checked) =>
                   setRenderSettings({ planarReflectionEnabled: checked })
                 }
               />
               {renderSettings.planarReflectionEnabled && (
                 <div className="space-y-2">
-                  <Label>Mirror resolution</Label>
+                  <Label>{m.player_settings_mirror_resolution()}</Label>
                   <Select
                     onValueChange={(nextValue) => {
                       if (nextValue !== null) {
@@ -668,10 +680,10 @@ export function MmdSettings({
                       renderSettings.planarReflectionTextureSize,
                     )}
                   >
-                    <SelectTrigger aria-label="Mirror resolution">
+                    <SelectTrigger aria-label={m.player_settings_mirror_resolution()}>
                       <SelectValue>
                         {renderSettings.planarReflectionTextureSize === 0
-                          ? "Stage default"
+                          ? m.player_settings_stage_default()
                           : `${renderSettings.planarReflectionTextureSize} × ${renderSettings.planarReflectionTextureSize}`}
                       </SelectValue>
                     </SelectTrigger>
@@ -679,15 +691,14 @@ export function MmdSettings({
                       {PLANAR_REFLECTION_TEXTURE_SIZE_OPTIONS.map((size) => (
                         <SelectItem key={size} value={String(size)}>
                           {size === 0
-                            ? "Stage default"
+                            ? m.player_settings_stage_default()
                             : `${size} × ${size}`}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Changing reflection settings reloads the current
-                    resources.
+                    {m.player_settings_reload_on_reflection_change()}
                   </p>
                 </div>
               )}
@@ -696,8 +707,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.bloomEnabled}
-            description="Soft glow around bright highlights, similar to AutoLuminous."
-            label="Bloom"
+            description={m.player_settings_bloom_description()}
+            label={m.player_settings_bloom()}
             onCheckedChange={(checked) =>
               setRenderSettings({ bloomEnabled: checked })
             }
@@ -705,7 +716,7 @@ export function MmdSettings({
           {renderSettings.bloomEnabled && (
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSlider
-                label="Bloom intensity"
+                label={m.player_settings_bloom_intensity()}
                 max={1}
                 min={0}
                 onChange={(value) =>
@@ -715,7 +726,7 @@ export function MmdSettings({
                 value={renderSettings.bloomIntensity}
               />
               <SettingSlider
-                label="Bloom threshold"
+                label={m.player_settings_bloom_threshold()}
                 max={1}
                 min={0}
                 onChange={(value) =>
@@ -729,8 +740,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.depthOfFieldEnabled}
-            description="Camera-focused blur inspired by ikBokeh and PowerDOF."
-            label="Depth of field"
+            description={m.player_settings_depth_of_field_description()}
+            label={m.player_settings_depth_of_field()}
             onCheckedChange={(checked) =>
               setRenderSettings({ depthOfFieldEnabled: checked })
             }
@@ -739,7 +750,7 @@ export function MmdSettings({
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSlider
                 formatValue={(value) => `${Math.round(value)} mm`}
-                label="Focus distance"
+                label={m.player_settings_focus_distance()}
                 max={10000}
                 min={100}
                 onChange={(value) =>
@@ -750,7 +761,7 @@ export function MmdSettings({
               />
               <SettingSlider
                 formatValue={(value) => `f/${value.toFixed(1)}`}
-                label="Aperture"
+                label={m.player_settings_aperture()}
                 max={16}
                 min={1}
                 onChange={(value) =>
@@ -764,8 +775,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.vignetteEnabled}
-            description="Darkens the frame edges to draw attention to the model."
-            label="Vignette"
+            description={m.player_settings_vignette_description()}
+            label={m.player_settings_vignette()}
             onCheckedChange={(checked) =>
               setRenderSettings({ vignetteEnabled: checked })
             }
@@ -773,7 +784,7 @@ export function MmdSettings({
           {renderSettings.vignetteEnabled && (
             <div className="rounded-lg border bg-muted/20 p-3">
               <SettingSlider
-                label="Vignette weight"
+                label={m.player_settings_vignette_weight()}
                 max={5}
                 min={0}
                 onChange={(value) =>
@@ -787,8 +798,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.toneMappingEnabled}
-            description="ACES tone mapping keeps bright areas filmic and controlled."
-            label="Filmic tone mapping"
+            description={m.player_settings_filmic_tone_mapping_description()}
+            label={m.player_settings_filmic_tone_mapping()}
             onCheckedChange={(checked) =>
               setRenderSettings({ toneMappingEnabled: checked })
             }
@@ -797,7 +808,7 @@ export function MmdSettings({
             formatValue={(value) =>
               `${value > 0 ? "+" : ""}${Math.round(value)}`
             }
-            label="Color saturation"
+            label={m.player_settings_color_saturation()}
             max={100}
             min={-100}
             onChange={(value) =>
@@ -811,10 +822,10 @@ export function MmdSettings({
 
           <TabsPanel className="space-y-4 pt-2" value="render">
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
-          <SettingHeading title="Materials" />
+          <SettingHeading title={m.player_settings_materials()} />
 
           <div className="space-y-2">
-            <Label>Rendering mode</Label>
+            <Label>{m.player_settings_rendering_mode()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue !== null) {
@@ -826,38 +837,38 @@ export function MmdSettings({
               }}
               value={renderSettings.materialRenderMode}
             >
-              <SelectTrigger aria-label="Material rendering mode">
+              <SelectTrigger aria-label={m.player_settings_rendering_mode()}>
                 <SelectValue>
                   {
                     MATERIAL_RENDER_MODE_LABELS[
                       renderSettings.materialRenderMode
-                    ]
+                    ]()
                   }
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="mmd">MMD accurate</SelectItem>
-                <SelectItem value="balanced">Balanced</SelectItem>
-                <SelectItem value="performance">Performance</SelectItem>
+                <SelectItem value="mmd">{m.player_settings_render_mode_mmd()}</SelectItem>
+                <SelectItem value="balanced">{m.player_settings_render_mode_balanced()}</SelectItem>
+                <SelectItem value="performance">{m.player_settings_render_mode_performance()}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Changing this option reloads the current model.
+              {m.player_settings_reload_on_rendering_mode_change()}
             </p>
           </div>
 
           <SettingSwitch
             checked={renderSettings.applyAmbientColorToDiffuse}
-            description="Uses the model's ambient color in the final diffuse color."
-            label="Ambient material color"
+            description={m.player_settings_ambient_material_color_description()}
+            label={m.player_settings_ambient_material_color()}
             onCheckedChange={(checked) =>
               setRenderSettings({ applyAmbientColorToDiffuse: checked })
             }
           />
           <SettingSwitch
             checked={renderSettings.ignoreDiffuseWhenToonTextureIsNull}
-            description="Keeps materials without a toon texture from becoming too dark."
-            label="Missing toon fallback"
+            description={m.player_settings_missing_toon_fallback_description()}
+            label={m.player_settings_missing_toon_fallback()}
             onCheckedChange={(checked) =>
               setRenderSettings({
                 ignoreDiffuseWhenToonTextureIsNull: checked,
@@ -866,16 +877,16 @@ export function MmdSettings({
           />
           <SettingSwitch
             checked={renderSettings.sphereTextureEnabled}
-            description="Enables sphere maps used for metallic and glossy highlights."
-            label="Sphere maps"
+            description={m.player_settings_sphere_maps_description()}
+            label={m.player_settings_sphere_maps()}
             onCheckedChange={(checked) =>
               setRenderSettings({ sphereTextureEnabled: checked })
             }
           />
           <SettingSwitch
             checked={renderSettings.toonTextureEnabled}
-            description="Enables the model's toon-ramp shading textures."
-            label="Toon maps"
+            description={m.player_settings_toon_maps_description()}
+            label={m.player_settings_toon_maps()}
             onCheckedChange={(checked) =>
               setRenderSettings({ toonTextureEnabled: checked })
             }
@@ -884,15 +895,14 @@ export function MmdSettings({
 
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div>
-            <SettingHeading title="Render quality" />
+            <SettingHeading title={m.player_settings_render_quality()} />
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Presets balance visual fidelity against GPU cost. Advanced
-              options tune each effect individually.
+              {m.player_settings_render_quality_description()}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label>Quality preset</Label>
+            <Label>{m.player_settings_quality_preset()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (
@@ -911,12 +921,12 @@ export function MmdSettings({
               }}
               value={getRenderQualityPreset(renderSettings)}
             >
-              <SelectTrigger aria-label="Quality preset">
+              <SelectTrigger aria-label={m.player_settings_quality_preset()}>
                 <SelectValue>
                   {
                     QUALITY_PRESET_LABELS[
                       getRenderQualityPreset(renderSettings)
-                    ]
+                    ]()
                   }
                 </SelectValue>
               </SelectTrigger>
@@ -927,27 +937,27 @@ export function MmdSettings({
                   .filter((preset) => preset !== "custom")
                   .map((preset) => (
                     <SelectItem key={preset} value={preset}>
-                      {QUALITY_PRESET_LABELS[preset]}
+                      {QUALITY_PRESET_LABELS[preset]()}
                     </SelectItem>
                   ))}
                 {getRenderQualityPreset(renderSettings) === "custom" && (
                   <SelectItem disabled value="custom">
-                    Custom
+                    {m.player_settings_quality_preset_custom()}
                   </SelectItem>
                 )}
               </SelectContent>
             </Select>
             {getRenderQualityPreset(renderSettings) === "custom" && (
               <p className="text-xs text-muted-foreground">
-                Custom values are currently applied.
+                {m.player_settings_custom_values_applied()}
               </p>
             )}
           </div>
 
           <SettingSwitch
             checked={renderSettings.rimLightEnabled}
-            description="Faint cool back light that separates the model from the background."
-            label="Rim light"
+            description={m.player_settings_rim_light_description()}
+            label={m.player_settings_rim_light()}
             onCheckedChange={(checked) =>
               setRenderSettings({ rimLightEnabled: checked })
             }
@@ -955,7 +965,7 @@ export function MmdSettings({
           {renderSettings.rimLightEnabled && (
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSlider
-                label="Rim light intensity"
+                label={m.player_settings_rim_light_intensity()}
                 max={1}
                 min={0}
                 onChange={(value) =>
@@ -968,7 +978,7 @@ export function MmdSettings({
           )}
 
           <div className="space-y-2">
-            <Label>Antialiasing samples</Label>
+            <Label>{m.player_settings_antialiasing_samples()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue !== null) {
@@ -977,7 +987,7 @@ export function MmdSettings({
               }}
               value={String(renderSettings.msaaSamples)}
             >
-              <SelectTrigger aria-label="Antialiasing samples">
+              <SelectTrigger aria-label={m.player_settings_antialiasing_samples()}>
                 <SelectValue>{renderSettings.msaaSamples}×</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -991,7 +1001,7 @@ export function MmdSettings({
           </div>
 
           <div className="space-y-2">
-            <Label>Texture filtering</Label>
+            <Label>{m.player_settings_texture_filtering()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue !== null) {
@@ -1004,35 +1014,35 @@ export function MmdSettings({
               }}
               value={String(renderSettings.textureAnisotropy)}
             >
-              <SelectTrigger aria-label="Texture filtering quality">
+              <SelectTrigger aria-label={m.player_settings_texture_filtering()}>
                 <SelectValue>
-                  {renderSettings.textureAnisotropy}× anisotropic
+                  {m.player_settings_anisotropic({ level: renderSettings.textureAnisotropy })}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {TEXTURE_ANISOTROPY_OPTIONS.map((level) => (
                   <SelectItem key={level} value={String(level)}>
-                    {level}× anisotropic
+                    {m.player_settings_anisotropic({ level })}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Sharpens angled and distant model or stage textures.
+              {m.player_settings_texture_filtering_description()}
             </p>
           </div>
 
           <SettingSwitch
             checked={renderSettings.fxaaEnabled}
-            description="Fast post-process filter that smooths remaining jagged edges after MSAA."
-            label="FXAA"
+            description={m.player_settings_fxaa_description()}
+            label={m.player_settings_fxaa()}
             onCheckedChange={(checked) =>
               setRenderSettings({ fxaaEnabled: checked })
             }
           />
 
           <div className="space-y-2">
-            <Label>Supersampling</Label>
+            <Label>{m.player_settings_supersampling()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue !== null) {
@@ -1043,7 +1053,7 @@ export function MmdSettings({
               }}
               value={String(renderSettings.supersamplingScale)}
             >
-              <SelectTrigger aria-label="Supersampling">
+              <SelectTrigger aria-label={m.player_settings_supersampling()}>
                 <SelectValue>
                   {renderSettings.supersamplingScale}×
                 </SelectValue>
@@ -1060,7 +1070,7 @@ export function MmdSettings({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Shadow map</Label>
+              <Label>{m.player_settings_shadow_map()}</Label>
               <Select
                 onValueChange={(nextValue) => {
                   if (nextValue !== null) {
@@ -1069,7 +1079,7 @@ export function MmdSettings({
                 }}
                 value={String(renderSettings.shadowMapSize)}
               >
-                <SelectTrigger aria-label="Shadow map resolution">
+                <SelectTrigger aria-label={m.player_settings_shadow_map()}>
                   <SelectValue>
                     {renderSettings.shadowMapSize >= 1024
                       ? `${renderSettings.shadowMapSize / 1024}K`
@@ -1086,7 +1096,7 @@ export function MmdSettings({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Shadow softness</Label>
+              <Label>{m.player_settings_shadow_softness()}</Label>
               <Select
                 onValueChange={(nextValue) => {
                   if (nextValue === "pcf" || nextValue === "pcss") {
@@ -1095,16 +1105,16 @@ export function MmdSettings({
                 }}
                 value={renderSettings.shadowFiltering}
               >
-                <SelectTrigger aria-label="Shadow filtering">
+                <SelectTrigger aria-label={m.player_settings_shadow_softness()}>
                   <SelectValue>
                     {renderSettings.shadowFiltering === "pcss"
-                      ? "Soft (PCSS)"
-                      : "Crisp (PCF)"}
+                      ? m.player_settings_shadow_soft()
+                      : m.player_settings_shadow_crisp()}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="pcf">Crisp (PCF)</SelectItem>
-                  <SelectItem value="pcss">Soft (PCSS)</SelectItem>
+                  <SelectItem value="pcf">{m.player_settings_shadow_crisp()}</SelectItem>
+                  <SelectItem value="pcss">{m.player_settings_shadow_soft()}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1112,8 +1122,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.ssaoEnabled}
-            description="Darkens crevices between hair, clothes and body for depth."
-            label="Ambient occlusion (SSAO)"
+            description={m.player_settings_ambient_occlusion_description()}
+            label={m.player_settings_ambient_occlusion()}
             onCheckedChange={(checked) =>
               setRenderSettings({ ssaoEnabled: checked })
             }
@@ -1122,7 +1132,7 @@ export function MmdSettings({
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSlider
                 formatValue={(value) => value.toFixed(4)}
-                label="SSAO radius"
+                label={m.player_settings_ssao_radius()}
                 max={0.005}
                 min={0.0001}
                 onChange={(value) =>
@@ -1132,7 +1142,7 @@ export function MmdSettings({
                 value={renderSettings.ssaoRadius}
               />
               <SettingSlider
-                label="SSAO strength"
+                label={m.player_settings_ssao_strength()}
                 max={2}
                 min={0}
                 onChange={(value) =>
@@ -1146,8 +1156,8 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.ssrEnabled}
-            description="Screen-space reflections on glossy surfaces. Experimental with MMD toon materials; best on reflective stages."
-            label="Screen-space reflections (SSR)"
+            description={m.player_settings_screen_space_reflections_description()}
+            label={m.player_settings_screen_space_reflections()}
             onCheckedChange={(checked) =>
               setRenderSettings({ ssrEnabled: checked })
             }
@@ -1155,7 +1165,7 @@ export function MmdSettings({
           {renderSettings.ssrEnabled && (
             <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
               <SettingSlider
-                label="SSR strength"
+                label={m.player_settings_ssr_strength()}
                 max={2}
                 min={0}
                 onChange={(value) =>
@@ -1165,7 +1175,7 @@ export function MmdSettings({
                 value={renderSettings.ssrStrength}
               />
               <div className="space-y-2">
-                <Label>SSR quality</Label>
+                <Label>{m.player_settings_ssr_quality()}</Label>
                 <Select
                   onValueChange={(nextValue) => {
                     if (nextValue === "low" || nextValue === "medium" || nextValue === "high") {
@@ -1174,15 +1184,15 @@ export function MmdSettings({
                   }}
                   value={renderSettings.ssrQuality}
                 >
-                  <SelectTrigger aria-label="SSR quality">
+                  <SelectTrigger aria-label={m.player_settings_ssr_quality()}>
                     <SelectValue>
-                      {SSR_QUALITY_LABELS[renderSettings.ssrQuality]}
+                      {SSR_QUALITY_LABELS[renderSettings.ssrQuality]()}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="low">{m.player_settings_quality_low()}</SelectItem>
+                    <SelectItem value="medium">{m.player_settings_quality_medium()}</SelectItem>
+                    <SelectItem value="high">{m.player_settings_quality_high()}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1191,7 +1201,7 @@ export function MmdSettings({
 
           <SettingSlider
             formatValue={(value) => `${Math.round(value)}°`}
-            label="Physics joint limit"
+            label={m.player_settings_physics_joint_limit()}
             max={30}
             min={5}
             onChange={setPhysicsLimitDraft}
@@ -1203,7 +1213,7 @@ export function MmdSettings({
           />
 
           <div className="space-y-2">
-            <Label>Physics engine</Label>
+            <Label>{m.player_settings_physics_engine()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue === "ammo" || nextValue === "havok") {
@@ -1212,28 +1222,25 @@ export function MmdSettings({
               }}
               value={renderSettings.physicsBackend}
             >
-              <SelectTrigger aria-label="Physics engine">
+              <SelectTrigger aria-label={m.player_settings_physics_engine()}>
                 <SelectValue>
                   {renderSettings.physicsBackend === "ammo"
-                    ? "Bullet (MMD accurate)"
-                    : "Havok (lighter)"}
+                    ? m.player_settings_physics_bullet()
+                    : m.player_settings_physics_havok()}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ammo">Bullet (MMD accurate)</SelectItem>
-                <SelectItem value="havok">Havok (lighter)</SelectItem>
+                <SelectItem value="ammo">{m.player_settings_physics_bullet()}</SelectItem>
+                <SelectItem value="havok">{m.player_settings_physics_havok()}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Bullet matches how MMD itself simulates skirts and hair, and
-              honors the model's joint springs. Havok loads faster but drops
-              those settings. Changing the engine reloads the current
-              resources.
+              {m.player_settings_physics_engine_description()}
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label>Physics step rate</Label>
+            <Label>{m.player_settings_physics_step_rate()}</Label>
             <Select
               onValueChange={(nextValue) => {
                 if (nextValue === "30" || nextValue === "60" || nextValue === "120") {
@@ -1242,7 +1249,7 @@ export function MmdSettings({
               }}
               value={String(renderSettings.physicsStepRate)}
             >
-              <SelectTrigger aria-label="Physics step rate">
+              <SelectTrigger aria-label={m.player_settings_physics_step_rate()}>
                 <SelectValue>{renderSettings.physicsStepRate} Hz</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -1252,15 +1259,14 @@ export function MmdSettings({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Higher rates simulate hair and skirts more smoothly at a CPU
-              cost.
+              {m.player_settings_physics_step_rate_description()}
             </p>
           </div>
 
           <div className="space-y-2">
             <div className={renderSettings.physicsBackend === "havok" ? "opacity-50" : undefined}>
               <SettingSlider
-                label="Solver iterations"
+                label={m.player_settings_solver_iterations()}
                 max={30}
                 min={5}
                 onChange={(value) =>
@@ -1272,19 +1278,18 @@ export function MmdSettings({
             </div>
             {renderSettings.physicsBackend === "havok" ? (
               <p className="text-xs text-muted-foreground">
-                Only available with the Bullet engine.
+                {m.player_settings_solver_bullet_only()}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                More iterations resolve clipping between hair, clothes and
-                skin more reliably.
+                {m.player_settings_solver_iterations_description()}
               </p>
             )}
           </div>
 
           <SettingSlider
             formatValue={(value) => `${value.toFixed(2)}×`}
-            label="Physics strength"
+            label={m.player_settings_physics_strength()}
             max={3}
             min={0.5}
             onChange={setPhysicsStrengthDraft}
@@ -1295,35 +1300,31 @@ export function MmdSettings({
             value={physicsStrengthDraft}
           />
           <p className="text-xs text-muted-foreground">
-            Stiffness of the model's joints; below 1 makes hair and skirts
-            softer, above 1 stiffer. Changing this value reloads the current
-            resources.
+            {m.player_settings_physics_strength_description()}
           </p>
           <p className="text-xs text-muted-foreground">
-            Lower joint limits keep the model's original hair and skirt
-            motion; higher values improve stability on broken joints.
-            Changing SSAO, SSR, physics or this value reloads the current
-            resources.
+            {m.player_settings_joint_limit_description()}
           </p>
         </section>
 
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <div>
-            <SettingHeading title="FPS overlay" />
+            <SettingHeading title={m.player_settings_fps_overlay()} />
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              RTSS-style frame time monitor over the wallpaper. Toggle it
-              anytime with the <Kbd>`</Kbd> key.
+              {m.player_settings_fps_overlay_description()}{" "}
+              <Kbd>`</Kbd>{" "}
+              {m.player_settings_fps_overlay_key_suffix()}
             </p>
           </div>
           <SettingSwitch
             checked={overlayVisible}
-            description="Shows FPS, frame time, 1% lows and GPU stats over the wallpaper."
-            label="Show performance overlay"
+            description={m.player_settings_show_performance_overlay_description()}
+            label={m.player_settings_show_performance_overlay()}
             onCheckedChange={setOverlayVisible}
           />
           <div className="space-y-2">
             <p className="text-xs font-medium text-foreground/80">
-              Live stats
+              {m.player_settings_live_stats()}
             </p>
             <LivePerformanceReadout />
           </div>
@@ -1335,13 +1336,13 @@ export function MmdSettings({
       <SheetFooter>
         <div className="flex-1 space-y-1">
           <SettingHeading
-            title="Volume"
+            title={m.player_settings_volume()}
             value={`${Math.round(volume * 100)}%`}
           />
 
           <Slider
             className="mb-2"
-            aria-label="Volume"
+            aria-label={m.player_settings_volume()}
             max={1}
             min={0}
             onValueChange={(nextVolume) => {

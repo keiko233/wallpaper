@@ -1,0 +1,19 @@
+{
+  "name": "@wallpaper/i18n",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "compile": "paraglide-js compile --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations --strategy localStorage preferredLanguage baseLocale",
+    "compile:watch": "paraglide-js compile --watch --project ./project.inlang --outdir ./src/paraglide --emit-ts-declarations --strategy localStorage preferredLanguage baseLocale"
+  },
+  "dependencies": {
+    "@inlang/paraglide-js": "^2.23.1"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

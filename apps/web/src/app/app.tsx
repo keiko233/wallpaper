@@ -4,6 +4,7 @@ import {
 } from "../db";
 import { createPlayerPersistence } from "../db/player-persistence";
 import Player from "@wallpaper/player";
+import { m, useLocale } from "@wallpaper/i18n";
 import { AlertCircle, Library } from "lucide-react";
 import {
   useEffect,
@@ -44,6 +45,7 @@ export default function WallpaperClientApp({
   bundledResources = EMPTY_BUNDLED_RESOURCES,
   defaultSourceUrl,
 }: WallpaperClientAppProps) {
+  useLocale();
   const [database] = useState(() => new WallpaperClientDatabase());
   const [cache] = useState(() => new WallpaperCacheDatabase());
   const [libraryRevision, setLibraryRevision] = useState(0);
@@ -141,7 +143,7 @@ export default function WallpaperClientApp({
           variant="error"
         >
           <AlertCircle />
-          <AlertTitle>Local library could not be loaded</AlertTitle>
+          <AlertTitle>{m.web_local_library_load_failed()}</AlertTitle>
           <AlertDescription>{materializeError}</AlertDescription>
         </Alert>
       )}
@@ -155,10 +157,9 @@ function EmptyLibrary() {
       <Card className="w-full max-w-lg shadow-2xl shadow-overlay">
         <CardHeader className="text-center">
           <Library className="mx-auto mb-2 size-8 text-muted-foreground" />
-          <CardTitle>Your playlist is empty</CardTitle>
+          <CardTitle>{m.web_empty_playlist_title()}</CardTitle>
           <CardDescription>
-            Open player setup below, then add at least one model, motion,
-            and stage. Everything you add is cached only on this device.
+            {m.web_empty_playlist_description()}
           </CardDescription>
         </CardHeader>
       </Card>

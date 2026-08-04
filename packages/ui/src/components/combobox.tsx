@@ -2,6 +2,7 @@
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { ChevronsUpDownIcon, XIcon } from "lucide-react";
+import { m } from "@wallpaper/i18n";
 import * as React from "react";
 import { cn } from "@wallpaper/ui/utils";
 import { Input } from "@wallpaper/ui/input";
@@ -419,7 +420,7 @@ export function ComboboxChipRemove(
 ): React.ReactElement {
   return (
     <ComboboxPrimitive.ChipRemove
-      aria-label="Remove"
+      aria-label={m.ui_remove()}
       className="h-full shrink-0 cursor-pointer px-1.5 opacity-80 hover:opacity-100 [&_svg:not([class*='size-'])]:size-4 sm:[&_svg:not([class*='size-'])]:size-3.5"
       data-slot="combobox-chip-remove"
       {...props}

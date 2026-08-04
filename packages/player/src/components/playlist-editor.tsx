@@ -8,6 +8,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Button } from "@wallpaper/ui/button";
+import { m } from "@wallpaper/i18n";
 import {
   Dialog,
   DialogDescription,
@@ -111,16 +112,14 @@ export function PlaylistEditor() {
     <Dialog>
       <DialogTrigger render={<Button size="sm" variant="outline" />}>
         <ListMusic />
-        Edit playlist
+        {m.player_playlist_edit()}
       </DialogTrigger>
 
       <DialogPopup className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Playlist</DialogTitle>
+          <DialogTitle>{m.player_playlist_title()}</DialogTitle>
           <DialogDescription>
-            Combine any model, motion, stage, and skybox. Audio and camera follow
-            the selected motion. The list loops continuously and is saved
-            automatically on this device.
+            {m.player_playlist_description()}
           </DialogDescription>
         </DialogHeader>
 
@@ -135,7 +134,7 @@ export function PlaylistEditor() {
                 key={item.id}
               >
                 <button
-                  aria-label={`Play item ${index + 1}`}
+                  aria-label={m.player_playlist_play_item({ n: index + 1 })}
                   className="text-center text-xs tabular-nums text-muted-foreground hover:text-foreground"
                   onClick={() => selectPlaylistItem(index)}
                   type="button"
@@ -151,7 +150,11 @@ export function PlaylistEditor() {
                   }}
                   value={item.modelId}
                 >
-                  <SelectTrigger aria-label={`Model for item ${index + 1}`}>
+                  <SelectTrigger
+                    aria-label={m.player_playlist_model_for_item({
+                      n: index + 1,
+                    })}
+                  >
                     <SelectValue>
                       {
                         models.find((model) => model.id === item.modelId)!
@@ -175,7 +178,11 @@ export function PlaylistEditor() {
                   }}
                   value={item.motionId}
                 >
-                  <SelectTrigger aria-label={`Motion for item ${index + 1}`}>
+                  <SelectTrigger
+                    aria-label={m.player_playlist_motion_for_item({
+                      n: index + 1,
+                    })}
+                  >
                     <SelectValue>
                       {
                         motions.find((motion) => motion.id === item.motionId)!
@@ -200,7 +207,11 @@ export function PlaylistEditor() {
                   }}
                   value={item.stageId}
                 >
-                  <SelectTrigger aria-label={`Stage for item ${index + 1}`}>
+                  <SelectTrigger
+                    aria-label={m.player_playlist_stage_for_item({
+                      n: index + 1,
+                    })}
+                  >
                     <SelectValue>
                       {
                         stages.find((stage) => stage.id === item.stageId)!
@@ -224,7 +235,11 @@ export function PlaylistEditor() {
                   }}
                   value={item.skyboxId}
                 >
-                  <SelectTrigger aria-label={`Skybox for item ${index + 1}`}>
+                  <SelectTrigger
+                    aria-label={m.player_playlist_skybox_for_item({
+                      n: index + 1,
+                    })}
+                  >
                     <SelectValue>
                       {
                         skyboxes.find(
@@ -243,7 +258,7 @@ export function PlaylistEditor() {
 
                 <div className="flex gap-1">
                   <Button
-                    aria-label={`Move item ${index + 1} up`}
+                    aria-label={m.player_playlist_move_up({ n: index + 1 })}
                     disabled={index === 0}
                     onClick={() => moveItem(index, -1)}
                     size="icon-xs"
@@ -252,7 +267,7 @@ export function PlaylistEditor() {
                     <ArrowUp />
                   </Button>
                   <Button
-                    aria-label={`Move item ${index + 1} down`}
+                    aria-label={m.player_playlist_move_down({ n: index + 1 })}
                     disabled={index === playlist.length - 1}
                     onClick={() => moveItem(index, 1)}
                     size="icon-xs"
@@ -261,7 +276,7 @@ export function PlaylistEditor() {
                     <ArrowDown />
                   </Button>
                   <Button
-                    aria-label={`Delete item ${index + 1}`}
+                    aria-label={m.player_playlist_delete_item({ n: index + 1 })}
                     disabled={playlist.length <= 1}
                     onClick={() => removeItem(index)}
                     size="icon-xs"
@@ -277,19 +292,21 @@ export function PlaylistEditor() {
           <div className="rounded-xl border border-dashed p-3">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-medium">Add combination</h3>
+                <h3 className="text-sm font-medium">
+                  {m.player_playlist_add_combination()}
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  Duplicate combinations are allowed.
+                  {m.player_playlist_duplicates_allowed()}
                 </p>
               </div>
               <Button onClick={addItem} size="sm">
                 <Plus />
-                Add
+                {m.player_playlist_add()}
               </Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-4">
               <div className="space-y-1.5">
-                <Label>Model</Label>
+                <Label>{m.player_settings_model()}</Label>
                 <Select
                   onValueChange={(value) => {
                     if (value !== null) setModelIndex(Number(value));
@@ -308,7 +325,7 @@ export function PlaylistEditor() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Motion</Label>
+                <Label>{m.player_settings_motion()}</Label>
                 <Select
                   onValueChange={(value) => {
                     if (value !== null) setMotionIndex(Number(value));
@@ -328,7 +345,7 @@ export function PlaylistEditor() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Stage</Label>
+                <Label>{m.player_settings_stage()}</Label>
                 <Select
                   onValueChange={(value) => {
                     if (value !== null) setStageIndex(Number(value));
@@ -347,7 +364,7 @@ export function PlaylistEditor() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Skybox</Label>
+                <Label>{m.player_settings_skybox()}</Label>
                 <Select
                   onValueChange={(value) => {
                     if (value !== null) setSkyboxIndex(Number(value));
@@ -372,10 +389,10 @@ export function PlaylistEditor() {
         <DialogFooter className="justify-between sm:justify-between">
           <Button onClick={resetPlaylist} variant="outline">
             <RotateCcw />
-            Restore default
+            {m.player_playlist_restore_default()}
           </Button>
           <span className="self-center text-xs text-muted-foreground">
-            {playlist.length} items · saved automatically
+            {m.player_playlist_items_saved({ count: playlist.length })}
           </span>
         </DialogFooter>
       </DialogPopup>

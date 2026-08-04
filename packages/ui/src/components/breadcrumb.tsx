@@ -4,12 +4,13 @@ import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
 import { ChevronRight, MoreHorizontal } from "lucide-react";
 import type * as React from "react";
+import { m } from "@wallpaper/i18n";
 import { cn } from "@wallpaper/ui/utils";
 
 export function Breadcrumb({
   ...props
 }: React.ComponentProps<"nav">): React.ReactElement {
-  return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
+  return <nav aria-label={m.ui_breadcrumb()} data-slot="breadcrumb" {...props} />;
 }
 
 export function BreadcrumbList({

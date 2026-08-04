@@ -8,6 +8,8 @@
     "dev": "pnpm --filter @wallpaper/* dev",
     "dev:web": "pnpm --filter @wallpaper/web dev",
     "dev:wallpaper-engineer": "pnpm --filter @wallpaper/wallpaper-engineer dev",
+    "i18n:compile": "pnpm --filter @wallpaper/i18n compile",
+    "i18n:compile:watch": "pnpm --filter @wallpaper/i18n compile:watch",
     "build": "pnpm typecheck && pnpm run build:web && pnpm run build:wallpaper-engineer",
     "build:web": "pnpm --filter @wallpaper/web build",
     "build:wallpaper-engineer": "pnpm resources:build && pnpm resources:bundle-wallpaper-engine && pnpm --filter @wallpaper/wallpaper-engineer build",
@@ -19,7 +21,7 @@
     "resources:publish": "node --experimental-strip-types scripts/resources.ts publish-r2",
     "resources:bundle-wallpaper-engine": "node --experimental-strip-types scripts/resources.ts bundle-wallpaper-engine",
     "test": "vitest run",
-    "typecheck": "tsc -b"
+    "typecheck": "pnpm i18n:compile && tsc -b"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
