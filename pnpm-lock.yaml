@@ -204,7 +204,7 @@ importers:
         version: link:../ui
       babylon-mmd:
         specifier: ^1.2.0
-        version: 1.2.0(@babylonjs/core@9.19.0)
+        version: 1.3.0(@babylonjs/core@9.19.0)
       lucide-react:
         specifier: ^1.25.0
         version: 1.25.0(react@19.2.8)
@@ -1913,10 +1913,10 @@ packages:
   babel-plugin-react-compiler@1.0.0:
     resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
 
-  babylon-mmd@1.2.0:
-    resolution: {integrity: sha512-FAm9Fp7TZpx8iv8mxorHeje9vXW2ffOvTvTwvPfRQxIZPKW/yrP8fkj+dBS+hOibWtzoMDTaouMIEnGG5u2ciQ==}
+  babylon-mmd@1.3.0:
+    resolution: {integrity: sha512-+ms/0h43a77DM/txFGEFY3YnOnJSVlEYDYlRZTDg9m1mterByX+bpRM6R8xg+0iMVZZ86TXUks8NEfMJizuBRQ==}
     peerDependencies:
-      '@babylonjs/core': ^9.2.0
+      '@babylonjs/core': ^9.15.0
 
   babylonjs-gltf2interface@9.17.0:
     resolution: {integrity: sha512-nqiTh0w/9MODhsa4K4YWGRSXsGgUyPLevcexn4gYEsCxMSYQm48wm9NhXaw+DtvSQTtmh8JL0nqqFYNTyinACw==}
@@ -4693,7 +4693,7 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.7
 
-  babylon-mmd@1.2.0(@babylonjs/core@9.19.0):
+  babylon-mmd@1.3.0(@babylonjs/core@9.19.0):
     dependencies:
       '@babylonjs/core': 9.19.0
 
