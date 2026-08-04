@@ -7,7 +7,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ResourceManifestSchema,
@@ -311,7 +311,9 @@ describe("resource catalog builder", () => {
       model!.definition,
       model!.directory,
     );
-    expect(files.map((file) => file.slice(root.length + 1))).toEqual([
+    expect(
+      files.map((file) => file.slice(root.length + 1).split(sep).join("/")),
+    ).toEqual([
       "model-toon.pmx",
       "model.pmx",
       "textures/body.png",
