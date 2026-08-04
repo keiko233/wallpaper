@@ -726,6 +726,57 @@ describe("resource catalog builder", () => {
     ).toBeDefined();
   });
 
+  it("bundles a skybox declared by a stage resource", async () => {
+    const loaded = await makeSite();
+    await loaded.writeResource(
+      "bundled-sky-stage",
+      {
+        id: "bundled-sky-stage",
+        version: "1.0.0",
+        kind: "stage",
+        name: "Bundled sky stage",
+        artifact: {
+          fileName: "bundled-sky-stage.zip",
+          format: "zip",
+          entrypoints: {
+            stage: "stage.pmx",
+            skybox: "sky.pmx",
+          },
+        },
+      },
+      { "stage.pmx": "stage", "sky.pmx": "sky" },
+    );
+
+    await buildRepository(loaded, loaded.site.outputDirectory);
+    await buildWallpaperEngineBundle(loaded, loaded.site.outputDirectory);
+    const bundle = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/wallpaper-engine.json",
+        ),
+        "utf8",
+      ),
+    ) as {
+      resources: {
+        stages: Array<{ id: string; stagePath: string }>;
+        skyboxes: Array<{ id: string; name: string; skyboxPath: string }>;
+      };
+    };
+    expect(
+      bundle.resources.stages.find(
+        (stage) => stage.id === "builtin:stage:bundled-sky-stage",
+      ),
+    ).toMatchObject({
+      stagePath: "/resources/stages/bundled-sky-stage/stage.pmx",
+    });
+    expect(bundle.resources.skyboxes).toContainEqual({
+      id: "builtin:stage:bundled-sky-stage:skybox",
+      name: "Bundled sky stage (Sky)",
+      skyboxPath: "/resources/stages/bundled-sky-stage/sky.pmx",
+    });
+  });
+
   it("rejects render profiles on non-stage manifests", async () => {
     const loaded = await makeSite();
     await loaded.writeResource(

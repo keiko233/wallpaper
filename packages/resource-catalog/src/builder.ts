@@ -546,6 +546,15 @@ function runtimeIdForEntrypoint(
     : `${runtimeId}:${entrypoint.id}`;
 }
 
+function bundledSkyboxRuntimeId(
+  runtimeId: string,
+  entrypoint: ResolvedArtifactEntrypoint,
+): string {
+  return entrypoint.isDefault || entrypoint.id === null
+    ? `${runtimeId}:skybox`
+    : `${runtimeId}:skybox:${entrypoint.id}`;
+}
+
 function singleEntrypointPath(
   definition: ResourceDefinition,
   entrypoint: ResolvedArtifactEntrypoint,
@@ -954,6 +963,34 @@ export async function buildWallpaperEngineBundle(
               singleEntrypointPath(definition, entrypoint),
             ),
           });
+        }
+        if (definition.artifact.entrypoints["skybox"] !== undefined) {
+          for (const entrypoint of configuredEntrypointOptions(definition, [
+            "skybox",
+          ])) {
+            const entrypointRuntimeId = bundledSkyboxRuntimeId(
+              runtimeId,
+              entrypoint,
+            );
+            if (runtimeIds.has(entrypointRuntimeId)) {
+              throw new Error(
+                `Duplicate Wallpaper Engine runtime ID: ${entrypointRuntimeId}`,
+              );
+            }
+            runtimeIds.add(entrypointRuntimeId);
+            resources.skyboxes.push({
+              ...base,
+              id: entrypointRuntimeId,
+              name: entrypoint.name ?? `${definition.name} (Sky)`,
+              ...(entrypoint.remark === undefined
+                ? {}
+                : { remark: entrypoint.remark }),
+              skyboxPath: bundledPath(
+                definition,
+                singleEntrypointPath(definition, entrypoint),
+              ),
+            });
+          }
         }
         break;
       }

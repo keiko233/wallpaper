@@ -374,6 +374,39 @@ const SELECTABLE_ENTRYPOINT_KINDS: ReadonlySet<string> = new Set([
   "camera",
 ]);
 
+/**
+ * Entrypoint keys each resource kind may declare. A stage may additionally
+ * declare a "skybox" entrypoint when its artifact bundles a skybox model.
+ */
+const ENTRYPOINT_KEYS_BY_KIND: Readonly<Record<ResourceKind, readonly string[]>> = {
+  model: ["model"],
+  motion: ["motions"],
+  stage: ["stage", "skybox"],
+  skybox: ["skybox"],
+  audio: ["audio"],
+  camera: ["camera"],
+  video: [],
+};
+
+function validateEntrypointKeys(
+  value: {
+    kind: z.infer<typeof ResourceKindSchema>;
+    artifact: { entrypoints: z.infer<typeof EntrypointsSchema> };
+  },
+  context: z.RefinementCtx,
+): void {
+  const allowed = ENTRYPOINT_KEYS_BY_KIND[value.kind];
+  for (const key of Object.keys(value.artifact.entrypoints)) {
+    if (!allowed.includes(key)) {
+      context.addIssue({
+        code: "custom",
+        message: `Entrypoint key "${key}" is not supported for ${value.kind} resources. Supported keys: ${allowed.length === 0 ? "(none)" : allowed.join(", ")}.`,
+        path: ["artifact", "entrypoints", key],
+      });
+    }
+  }
+}
+
 function validateEntrypointVariantKinds(
   value: {
     kind: z.infer<typeof ResourceKindSchema>;
@@ -433,6 +466,7 @@ export const ResourceDefinitionSchema = z
       .strict(),
   })
   .strict()
+  .superRefine(validateEntrypointKeys)
   .superRefine(validateEntrypointVariantKinds)
   .superRefine(validateStageRenderProfile);
 
@@ -488,6 +522,7 @@ export const CatalogResourceSchema = z
       .strict(),
   })
   .strict()
+  .superRefine(validateEntrypointKeys)
   .superRefine(validateEntrypointVariantKinds)
   .superRefine(validateStageRenderProfile);
 

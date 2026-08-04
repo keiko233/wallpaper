@@ -786,4 +786,112 @@ describe("materializeLibrary", () => {
     database.close();
     cache.close();
   });
+
+  it("materializes a skybox bundled with a stage", async () => {
+    const options = createDatabaseOptions();
+    const database = new WallpaperClientDatabase(
+      "materialize-bundled-skybox",
+      options,
+    );
+    const cache = new WallpaperCacheDatabase(
+      "materialize-bundled-skybox-cache",
+      options,
+    );
+    const now = "2026-07-31T00:00:00.000Z";
+    const sha = "d".repeat(64);
+
+    await database.resources.bulkPut([
+      {
+        id: "source:city-party",
+        sourceId: "source",
+        sourceName: "Test",
+        upstreamId: "city-party",
+        kind: "stage",
+        name: "CityParty",
+        description: null,
+        categories: [],
+        tags: [],
+        visibility: "public",
+        publishedVersionId: "source:city-party@1.0.0",
+        currentVersion: "1.0.0",
+        coverUrl: null,
+        catalogRevision: "revision",
+        updatedAt: now,
+      },
+    ]);
+    await database.resourceVersions.bulkPut([
+      {
+        id: "source:city-party@1.0.0",
+        sourceId: "source",
+        upstreamId: "city-party",
+        upstreamVersion: "1.0.0",
+        resourceId: "source:city-party",
+        artifactId: "source:city-party@1.0.0",
+        format: "zip",
+        fileName: "city-party.zip",
+        contentType: "application/zip",
+        sha256: sha,
+        byteSize: 1,
+        entrypoints: {
+          stage: "stage.pmx",
+          skybox: "sky.pmx",
+        },
+        render: undefined,
+        publishedAt: now,
+      },
+    ]);
+    await database.libraryItems.bulkPut([
+      {
+        resourceId: "source:city-party",
+        resourceVersionId: "source:city-party@1.0.0",
+        sourceId: "source",
+        kind: "stage",
+        source: "remote",
+        addedAt: now,
+      },
+    ]);
+    await cache.artifactFiles.bulkPut([
+      {
+        sha256: sha,
+        path: "stage.pmx",
+        contentType: "application/octet-stream",
+        byteSize: 1,
+        lastAccessedAt: now,
+        blob: new Blob(["s"]),
+      },
+      {
+        sha256: sha,
+        path: "sky.pmx",
+        contentType: "application/octet-stream",
+        byteSize: 1,
+        lastAccessedAt: now,
+        blob: new Blob(["k"]),
+      },
+    ]);
+
+    const resources = await materializeLibrary(database, cache, {
+      models: [],
+      motions: [],
+      skyboxes: [],
+      stages: [],
+    });
+
+    expect(resources.stages).toEqual([
+      expect.objectContaining({
+        id: "remote:source:city-party",
+        stagePath: createVirtualResourceUrl(sha, "stage.pmx"),
+      }),
+    ]);
+    expect(resources.skyboxes).toEqual([
+      expect.objectContaining({
+        id: "remote:source:city-party:skybox",
+        name: "CityParty (Sky)",
+        skyboxPath: createVirtualResourceUrl(sha, "sky.pmx"),
+      }),
+    ]);
+
+    resources.dispose();
+    database.close();
+    cache.close();
+  });
 });

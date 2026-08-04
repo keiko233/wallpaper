@@ -172,6 +172,15 @@ function playerIdForEntrypoint(
     : `${id}:${entrypoint.id}`;
 }
 
+function bundledSkyboxPlayerId(
+  id: string,
+  entrypoint: ResolvedArtifactEntrypoint,
+): string {
+  return entrypoint.isDefault || entrypoint.id === null
+    ? `${id}:skybox`
+    : `${id}:skybox:${entrypoint.id}`;
+}
+
 interface VersionFiles {
   versionId: string;
   sha256: string;
@@ -433,6 +442,24 @@ export async function materializeLibrary(
               ? {}
               : { render: files.render }),
           });
+        }
+        if (files.entrypoints["skybox"] !== undefined) {
+          for (const entrypoint of resolveSelectableEntrypoints(
+            files.entrypoints,
+            ["skybox"],
+            files.paths,
+            [".pmx"],
+          )) {
+            resources.skyboxes.push({
+              id: bundledSkyboxPlayerId(id, entrypoint),
+              name: entrypoint.name ?? `${resource.name} (Sky)`,
+              skyboxPath: files.virtualUrls.get(entrypoint.paths[0]!)!,
+              ...(entrypoint.id === null
+                ? {}
+                : { group: resource.name }),
+              remark: entrypoint.remark ?? resource.description ?? undefined,
+            });
+          }
         }
         break;
       }

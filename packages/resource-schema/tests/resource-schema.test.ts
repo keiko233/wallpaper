@@ -29,6 +29,15 @@ const definition = {
   },
 };
 
+const stageDefinition = {
+  ...definition,
+  kind: "stage",
+  artifact: {
+    ...definition.artifact,
+    entrypoints: { stage: "stage.pmx" },
+  },
+};
+
 describe("resource schema", () => {
   it("normalizes definitions and applies platform defaults", () => {
     const parsed = ResourceDefinitionsSchema.parse({
@@ -259,6 +268,10 @@ describe("resource schema", () => {
     const parsed = ResourceManifestSchema.parse({
       ...definition,
       kind: "motion",
+      artifact: {
+        ...definition.artifact,
+        entrypoints: { motions: ["motion.vmd"] },
+      },
       dependencies: [
         { id: "example-audio", version: "1.0.0", binding: "audio" },
       ],
@@ -357,10 +370,64 @@ describe("resource schema", () => {
     ).toHaveLength(2);
   });
 
-  it("validates stage render profiles and applies their defaults", () => {
+  it("accepts stage manifests with a bundled skybox entrypoint", () => {
     const parsed = ResourceManifestSchema.parse({
       ...definition,
       kind: "stage",
+      artifact: {
+        ...definition.artifact,
+        entrypoints: {
+          stage: "stage.pmx",
+          skybox: "sky.pmx",
+        },
+      },
+    });
+
+    expect(parsed.kind).toBe("stage");
+    expect(
+      resolveArtifactEntrypoints(parsed.artifact.entrypoints, ["skybox"]),
+    ).toEqual([
+      {
+        id: null,
+        name: null,
+        paths: ["sky.pmx"],
+        isDefault: true,
+      },
+    ]);
+  });
+
+  it("rejects entrypoint keys unsupported by the resource kind", () => {
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        kind: "motion",
+        artifact: {
+          ...definition.artifact,
+          entrypoints: {
+            motions: ["motion.vmd"],
+            model: "model.pmx",
+          },
+        },
+      }),
+    ).toThrow(/not supported for motion/u);
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...definition,
+        kind: "skybox",
+        artifact: {
+          ...definition.artifact,
+          entrypoints: {
+            skybox: "sky.pmx",
+            stage: "stage.pmx",
+          },
+        },
+      }),
+    ).toThrow(/not supported for skybox/u);
+  });
+
+  it("validates stage render profiles and applies their defaults", () => {
+    const parsed = ResourceManifestSchema.parse({
+      ...stageDefinition,
       render: {
         reflection: {
           materialNames: ["地板", "水纹"],
@@ -413,8 +480,7 @@ describe("resource schema", () => {
 
   it("applies defaults to stage material PBR overrides", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         materials: [
           {
@@ -441,8 +507,7 @@ describe("resource schema", () => {
 
   it("applies clear coat defaults to stage material PBR overrides", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         materials: [
           {
@@ -472,10 +537,7 @@ describe("resource schema", () => {
   });
 
   it("rejects invalid stage material PBR override values", () => {
-    const stage = {
-      ...definition,
-      kind: "stage",
-    };
+    const stage = stageDefinition;
     expect(() =>
       ResourceManifestSchema.parse({
         ...stage,
@@ -584,8 +646,7 @@ describe("resource schema", () => {
 
   it("applies defaults to stage environment and lighting profiles", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         environment: {
           texturePath: "env/sky.dds",
@@ -618,8 +679,7 @@ describe("resource schema", () => {
 
   it("applies point light values and rejects empty point light arrays", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         lighting: {
           pointLights: [
@@ -655,10 +715,7 @@ describe("resource schema", () => {
   });
 
   it("rejects invalid environment and lighting profile values", () => {
-    const stage = {
-      ...definition,
-      kind: "stage",
-    };
+    const stage = stageDefinition;
     expect(() =>
       ResourceManifestSchema.parse({
         ...stage,
@@ -746,10 +803,7 @@ describe("resource schema", () => {
   });
 
   it("rejects invalid stage render profile values", () => {
-    const stage = {
-      ...definition,
-      kind: "stage",
-    };
+    const stage = stageDefinition;
     expect(() =>
       ResourceManifestSchema.parse({
         ...stage,
@@ -796,8 +850,7 @@ describe("resource schema", () => {
 
   it("applies defaults to stage environment profiles", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         environment: {
           texturePath: "textures/env.dds",
@@ -814,8 +867,7 @@ describe("resource schema", () => {
 
   it("applies defaults to stage lighting profiles", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         lighting: {
           hemispheric: {},
@@ -840,8 +892,7 @@ describe("resource schema", () => {
 
   it("validates stage point light entries", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         lighting: {
           pointLights: [
@@ -869,10 +920,7 @@ describe("resource schema", () => {
   });
 
   it("rejects invalid stage environment and lighting values", () => {
-    const stage = {
-      ...definition,
-      kind: "stage",
-    };
+    const stage = stageDefinition;
     expect(() =>
       ResourceManifestSchema.parse({
         ...stage,
@@ -973,8 +1021,7 @@ describe("resource schema", () => {
 
   it("applies defaults to stage shadow profiles", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         shadow: {},
       },
@@ -990,8 +1037,7 @@ describe("resource schema", () => {
 
   it("carries excluded caster material names in stage shadow profiles", () => {
     const parsed = ResourceManifestSchema.parse({
-      ...definition,
-      kind: "stage",
+      ...stageDefinition,
       render: {
         shadow: {
           excludedCasterMaterialNames: ["地板", "窗户"],
@@ -1009,10 +1055,7 @@ describe("resource schema", () => {
   });
 
   it("rejects invalid stage shadow profile values", () => {
-    const stage = {
-      ...definition,
-      kind: "stage",
-    };
+    const stage = stageDefinition;
     expect(() =>
       ResourceManifestSchema.parse({
         ...stage,
@@ -1177,6 +1220,7 @@ describe("resource schema", () => {
     expect(
       ResourceManifestSchema.parse({
         ...definition,
+        kind: "motion",
         artifact: {
           ...definition.artifact,
           entrypoints: { motions: motionVariants },
