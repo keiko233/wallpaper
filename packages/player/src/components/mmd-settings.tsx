@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { m } from "@wallpaper/i18n";
 import { Button } from "@wallpaper/ui/button";
+import { ColorPickerField } from "@wallpaper/ui/color-picker";
 import { Kbd } from "@wallpaper/ui/kbd";
 import { Label } from "@wallpaper/ui/label";
 import {
@@ -215,41 +216,6 @@ function SettingSwitch({
         onCheckedChange={onCheckedChange}
       />
     </div>
-  );
-}
-
-function SettingColor({
-  label,
-  value,
-  disabled = false,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  disabled?: boolean;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Label
-      className={cn(
-        "flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2",
-        disabled && "opacity-50",
-      )}
-    >
-      {label}
-      <span
-        className="size-7 rounded-md border shadow-xs"
-        style={{ backgroundColor: value }}
-      />
-      <input
-        aria-label={label}
-        className="sr-only"
-        disabled={disabled}
-        onChange={(event) => onChange(event.currentTarget.value)}
-        type="color"
-        value={value}
-      />
-    </Label>
   );
 }
 
@@ -602,20 +568,11 @@ export function MmdSettings({
 
         <section className="space-y-3 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading title={m.player_settings_appearance()} value={colorValue} />
-          <Label className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-            {m.player_settings_background_color()}
-            <span
-              className="size-7 rounded-md border shadow-xs"
-              style={{ backgroundColor: colorValue }}
-            />
-            <input
-              aria-label={m.player_settings_background_color()}
-              className="sr-only"
-              onChange={(event) => setBackground(event.currentTarget.value)}
-              type="color"
-              value={colorValue}
-            />
-          </Label>
+          <ColorPickerField
+            label={m.player_settings_background_color()}
+            onChange={setBackground}
+            value={colorValue}
+          />
         </section>
           </TabsPanel>
 
@@ -663,7 +620,7 @@ export function MmdSettings({
               </SelectContent>
             </Select>
           </div>
-          <SettingColor
+          <ColorPickerField
             disabled={lyricsSettings.colorMode !== "manual"}
             label={m.player_settings_lyrics_font_color()}
             onChange={(value) =>
@@ -780,7 +737,7 @@ export function MmdSettings({
                 </Select>
               </div>
               <div className="grid grid-cols-1 gap-2">
-                <SettingColor
+                <ColorPickerField
                   disabled={lyricsSettings.karaokeMode !== "manual"}
                   label={m.player_settings_lyrics_karaoke_from_color()}
                   onChange={(value) =>
@@ -791,7 +748,7 @@ export function MmdSettings({
                   }
                   value={lyricsSettings.karaokeFrom}
                 />
-                <SettingColor
+                <ColorPickerField
                   disabled={lyricsSettings.karaokeMode !== "manual"}
                   label={m.player_settings_lyrics_karaoke_to_color()}
                   onChange={(value) =>
@@ -886,24 +843,13 @@ export function MmdSettings({
             step={0.01}
             value={renderSettings.directionalLightIntensity}
           />
-          <Label className="flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-            {m.player_settings_key_light_color()}
-            <span
-              className="size-7 rounded-md border shadow-xs"
-              style={{ backgroundColor: renderSettings.directionalLightColor }}
-            />
-            <input
-              aria-label={m.player_settings_key_light_color()}
-              className="sr-only"
-              onChange={(event) =>
-                setRenderSettings({
-                  directionalLightColor: event.currentTarget.value,
-                })
-              }
-              type="color"
-              value={renderSettings.directionalLightColor}
-            />
-          </Label>
+          <ColorPickerField
+            label={m.player_settings_key_light_color()}
+            onChange={(value) =>
+              setRenderSettings({ directionalLightColor: value })
+            }
+            value={renderSettings.directionalLightColor}
+          />
           <SettingSlider
             formatValue={(value) => `${Math.round(value * 100)}%`}
             label={m.player_settings_shadow_opacity()}
