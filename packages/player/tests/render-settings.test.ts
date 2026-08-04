@@ -7,6 +7,11 @@ import {
 } from "../src/types";
 
 describe("render quality texture filtering", () => {
+  it("keeps planar reflections disabled by default", () => {
+    expect(DEFAULT_MMD_RENDER_SETTINGS.planarReflectionEnabled).toBe(false);
+    expect(DEFAULT_MMD_RENDER_SETTINGS.planarReflectionTextureSize).toBe(0);
+  });
+
   it("increases anisotropic filtering across quality presets", () => {
     expect(
       Object.values(RENDER_QUALITY_PRESETS).map(

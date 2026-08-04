@@ -41,6 +41,7 @@ import {
   getRenderQualityPreset,
   type MmdFpsLimit,
   type MmdQualityPreset,
+  type PlanarReflectionTextureSize,
   type TextureAnisotropyLevel,
 } from "../types";
 
@@ -63,6 +64,13 @@ const MSAA_OPTIONS = [1, 2, 4, 8] as const;
 const TEXTURE_ANISOTROPY_OPTIONS = [1, 4, 8, 16] as const;
 const SUPERSAMPLING_OPTIONS = [1, 1.5, 2] as const;
 const SHADOW_MAP_OPTIONS = [1024, 2048, 4096] as const;
+const PLANAR_REFLECTION_TEXTURE_SIZE_OPTIONS = [
+  0,
+  256,
+  512,
+  1_024,
+  2_048,
+] as const;
 const SSR_QUALITY_LABELS = {
   low: "Low",
   medium: "Medium",
@@ -624,7 +632,7 @@ export function MmdSettings({
 
           <SettingSwitch
             checked={renderSettings.stageEffectsEnabled}
-            description="Applies the stage's built-in look: reflective floor, emissive glow, and bloom tuning."
+            description="Applies the stage's built-in material, lighting, emissive, and bloom tuning."
             label="Stage effects"
             onCheckedChange={(checked) =>
               setRenderSettings({ stageEffectsEnabled: checked })
@@ -633,6 +641,59 @@ export function MmdSettings({
           <p className="text-xs text-muted-foreground">
             Changing this option reloads the current resources.
           </p>
+
+          {renderSettings.stageEffectsEnabled && (
+            <div className="space-y-4 rounded-lg border bg-muted/20 p-3">
+              <SettingSwitch
+                checked={renderSettings.planarReflectionEnabled}
+                description="Renders stage-profile and WorkingFloor mirrors. This can be expensive on the GPU."
+                label="Planar reflections"
+                onCheckedChange={(checked) =>
+                  setRenderSettings({ planarReflectionEnabled: checked })
+                }
+              />
+              {renderSettings.planarReflectionEnabled && (
+                <div className="space-y-2">
+                  <Label>Mirror resolution</Label>
+                  <Select
+                    onValueChange={(nextValue) => {
+                      if (nextValue !== null) {
+                        setRenderSettings({
+                          planarReflectionTextureSize: Number(
+                            nextValue,
+                          ) as PlanarReflectionTextureSize,
+                        });
+                      }
+                    }}
+                    value={String(
+                      renderSettings.planarReflectionTextureSize,
+                    )}
+                  >
+                    <SelectTrigger aria-label="Mirror resolution">
+                      <SelectValue>
+                        {renderSettings.planarReflectionTextureSize === 0
+                          ? "Stage default"
+                          : `${renderSettings.planarReflectionTextureSize} × ${renderSettings.planarReflectionTextureSize}`}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLANAR_REFLECTION_TEXTURE_SIZE_OPTIONS.map((size) => (
+                        <SelectItem key={size} value={String(size)}>
+                          {size === 0
+                            ? "Stage default"
+                            : `${size} × ${size}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Changing reflection settings reloads the current
+                    resources.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           <SettingSwitch
             checked={renderSettings.bloomEnabled}

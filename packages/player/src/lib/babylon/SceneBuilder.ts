@@ -1120,7 +1120,9 @@ export class SceneBuilder implements ISceneBuilder {
       stage: stageMesh.name,
       mmeEffects: profile.effects?.length ?? 0,
       pbrGroups: profile.materials?.length ?? 0,
-      planarReflection: profile.reflection !== undefined,
+      planarReflection:
+        profile.reflection !== undefined &&
+        this.renderSettings.planarReflectionEnabled,
       emissiveGroups: profile.emissive?.length ?? 0,
       bloom: profile.bloom !== undefined,
     });
@@ -1139,7 +1141,10 @@ export class SceneBuilder implements ISceneBuilder {
       this.applyStageLighting(profile.lighting);
     }
 
-    if (profile.reflection !== undefined) {
+    if (
+      profile.reflection !== undefined &&
+      this.renderSettings.planarReflectionEnabled
+    ) {
       this.applyStageReflection(
         profile.reflection,
         stageMesh,
@@ -1164,6 +1169,10 @@ export class SceneBuilder implements ISceneBuilder {
           stageMesh,
           preferredFloorMaterialNames,
         ),
+        planarReflectionEnabled:
+          this.renderSettings.planarReflectionEnabled,
+        planarReflectionTextureSize:
+          this.renderSettings.planarReflectionTextureSize,
         resolveStageUrl: (relativePath) =>
           this.resolveStageProfileUrl(relativePath),
       });
@@ -1302,9 +1311,13 @@ export class SceneBuilder implements ISceneBuilder {
     }
     planeY += reflection.planeOffset;
 
+    const textureSize =
+      this.renderSettings.planarReflectionTextureSize === 0
+        ? reflection.textureSize
+        : this.renderSettings.planarReflectionTextureSize;
     const mirror = new MirrorTexture(
       "stageRenderMirror",
-      reflection.textureSize,
+      textureSize,
       this.scene,
       false,
     );

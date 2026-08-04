@@ -9,7 +9,10 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { Scene } from "@babylonjs/core/scene";
 import type { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { MmdMesh } from "babylon-mmd/esm/Runtime/mmdMesh";
-import type { StageRenderProfile } from "../../types";
+import type {
+  PlanarReflectionTextureSize,
+  StageRenderProfile,
+} from "../../types";
 import { applyMmePostProcess } from "./MmdPostProcessAdapter";
 import { createFloorMirrorPlane } from "./mirror-plane";
 import { getMeshGeometryBounds } from "./mesh-geometry-bounds";
@@ -28,6 +31,8 @@ export interface MmdEffectHostOptions {
   modelMesh: MmdMesh;
   skyboxMesh: MmdMesh | null;
   preferredFloorMeshes?: readonly Mesh[];
+  planarReflectionEnabled: boolean;
+  planarReflectionTextureSize: PlanarReflectionTextureSize;
   resolveStageUrl(relativePath: string): string;
 }
 
@@ -44,6 +49,8 @@ export class MmdEffectHost {
   private readonly modelMesh: MmdMesh;
   private readonly skyboxMesh: MmdMesh | null;
   private readonly preferredFloorMeshes: readonly Mesh[];
+  private readonly planarReflectionEnabled: boolean;
+  private readonly planarReflectionTextureSize: PlanarReflectionTextureSize;
   private readonly resolveStageUrl: (relativePath: string) => string;
 
   public constructor(options: MmdEffectHostOptions) {
@@ -53,6 +60,8 @@ export class MmdEffectHost {
     this.modelMesh = options.modelMesh;
     this.skyboxMesh = options.skyboxMesh;
     this.preferredFloorMeshes = options.preferredFloorMeshes ?? [];
+    this.planarReflectionEnabled = options.planarReflectionEnabled;
+    this.planarReflectionTextureSize = options.planarReflectionTextureSize;
     this.resolveStageUrl = options.resolveStageUrl;
   }
 
@@ -128,6 +137,7 @@ export class MmdEffectHost {
       );
       return;
     }
+    if (!this.planarReflectionEnabled) return;
     if (profile.accessoryPath === undefined) {
       throw new Error("WorkingFloor-compatible effects require accessoryPath");
     }
@@ -201,9 +211,13 @@ export class MmdEffectHost {
     reflector.position.y = localCenter.y - meshData.bounds.max[1];
 
     const target = compiled.classification.offscreenTargets[0];
+    const textureSize =
+      this.planarReflectionTextureSize === 0
+        ? profile.textureSize
+        : this.planarReflectionTextureSize;
     const mirror = new MirrorTexture(
       `mme:${target?.name ?? "offscreen"}`,
-      profile.textureSize,
+      textureSize,
       this.scene,
       false,
     );
@@ -246,7 +260,7 @@ export class MmdEffectHost {
           max: reflectorBounds.maximumWorld.y,
         },
         opacity: material.alpha,
-        textureSize: profile.textureSize,
+        textureSize,
         preferredFloorMeshes: this.preferredFloorMeshes.map(
           (mesh) => mesh.material?.name ?? mesh.name,
         ),

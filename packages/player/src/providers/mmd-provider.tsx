@@ -32,6 +32,7 @@ import {
   type ModelList,
   type MotionList,
   type PlayerPersistence,
+  type PlanarReflectionTextureSize,
   type ShadowFilteringMode,
   type SkyboxList,
   type SsrQualityLevel,
@@ -167,6 +168,18 @@ function normalizeTextureAnisotropy(
     : DEFAULT_MMD_RENDER_SETTINGS.textureAnisotropy;
 }
 
+function normalizePlanarReflectionTextureSize(
+  value: unknown,
+): PlanarReflectionTextureSize {
+  return value === 0 ||
+    value === 256 ||
+    value === 512 ||
+    value === 1_024 ||
+    value === 2_048
+    ? value
+    : DEFAULT_MMD_RENDER_SETTINGS.planarReflectionTextureSize;
+}
+
 function normalizeRenderSettings(value: unknown): MmdRenderSettings {
   const candidate =
     typeof value === "object" && value !== null
@@ -263,6 +276,13 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
     stageEffectsEnabled: normalizeBoolean(
       candidate.stageEffectsEnabled,
       defaults.stageEffectsEnabled,
+    ),
+    planarReflectionEnabled: normalizeBoolean(
+      candidate.planarReflectionEnabled,
+      defaults.planarReflectionEnabled,
+    ),
+    planarReflectionTextureSize: normalizePlanarReflectionTextureSize(
+      candidate.planarReflectionTextureSize,
     ),
     applyAmbientColorToDiffuse: normalizeBoolean(
       candidate.applyAmbientColorToDiffuse,
@@ -1154,6 +1174,9 @@ export function MmdProvider({
       const requiresReload =
         next.materialRenderMode !== current.materialRenderMode ||
         next.stageEffectsEnabled !== current.stageEffectsEnabled ||
+        next.planarReflectionEnabled !== current.planarReflectionEnabled ||
+        next.planarReflectionTextureSize !==
+          current.planarReflectionTextureSize ||
         next.ssaoEnabled !== current.ssaoEnabled ||
         next.ssrEnabled !== current.ssrEnabled ||
         next.physicsConstraintLimitDegrees !==

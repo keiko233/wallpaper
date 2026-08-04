@@ -146,6 +146,9 @@ export type SsrQualityLevel = "low" | "medium" | "high";
 
 export type TextureAnisotropyLevel = 1 | 4 | 8 | 16;
 
+/** 0 keeps the reflection render target size authored by the stage. */
+export type PlanarReflectionTextureSize = 0 | 256 | 512 | 1_024 | 2_048;
+
 /** Renderer frame rate cap in FPS (0 disables the cap). */
 export type MmdFpsLimit = 0 | 30 | 60 | 120 | 144;
 
@@ -177,6 +180,10 @@ export interface MmdRenderSettings {
   colorSaturation: number;
   materialRenderMode: MmdMaterialRenderMode;
   stageEffectsEnabled: boolean;
+  /** Planar stage and WorkingFloor reflections. Changing requires a reload. */
+  planarReflectionEnabled: boolean;
+  /** Reflection render target size, or 0 to use the stage-authored value. */
+  planarReflectionTextureSize: PlanarReflectionTextureSize;
   applyAmbientColorToDiffuse: boolean;
   ignoreDiffuseWhenToonTextureIsNull: boolean;
   sphereTextureEnabled: boolean;
@@ -385,6 +392,8 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   colorSaturation: 8,
   materialRenderMode: "mmd",
   stageEffectsEnabled: true,
+  planarReflectionEnabled: false,
+  planarReflectionTextureSize: 0,
   applyAmbientColorToDiffuse: true,
   ignoreDiffuseWhenToonTextureIsNull: true,
   sphereTextureEnabled: true,
