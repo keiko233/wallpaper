@@ -29,7 +29,6 @@ export class BaseRuntime {
   private _running = false;
   private _lastFrameAt = 0;
   private _skipNextFrameSample = true;
-  private _frameIntervalMs = 0;
 
   private constructor(params: BaseRuntimeInitParams) {
     this._canvas = params.canvas;
@@ -71,11 +70,6 @@ export class BaseRuntime {
     this._engine.stopRenderLoop(this._onTick);
   }
 
-  /** Caps the render loop to the given frame rate; 0 or negative disables the cap. */
-  public setFpsLimit(framesPerSecond: number): void {
-    this._frameIntervalMs = framesPerSecond > 0 ? 1000 / framesPerSecond : 0;
-  }
-
   public dispose(): void {
     if (this._disposed) return;
     this.stop();
@@ -111,14 +105,6 @@ export class BaseRuntime {
     const onFrame = this._onFrame;
     return () => {
       const now = performance.now();
-      if (
-        this._frameIntervalMs > 0 &&
-        now - this._lastFrameAt < this._frameIntervalMs
-      ) {
-        return;
-      }
-      const frameTimeMs = now - this._lastFrameAt;
-      this._lastFrameAt = now;
       scene.render();
 
       if (document.visibilityState !== "visible") return;
@@ -126,6 +112,8 @@ export class BaseRuntime {
         this._skipNextFrameSample = false;
         return;
       }
+      const frameTimeMs = now - this._lastFrameAt;
+      this._lastFrameAt = now;
       onFrame?.(frameTimeMs, engine);
     };
   }

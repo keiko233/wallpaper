@@ -23,7 +23,6 @@ import {
 } from "./mmd-context";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
-  type MmdFpsLimit,
   type MmdMaterialRenderMode,
   type MmdPhysicsBackend,
   type MmdPlaylistItem,
@@ -152,12 +151,6 @@ function normalizePhysicsBackend(value: unknown): MmdPhysicsBackend {
 
 function normalizePhysicsStepRate(value: unknown): number {
   return value === 30 || value === 120 ? value : 60;
-}
-
-function normalizeFpsLimit(value: unknown): MmdFpsLimit {
-  return value === 30 || value === 60 || value === 120 || value === 144
-    ? value
-    : 0;
 }
 
 function normalizeTextureAnisotropy(
@@ -372,7 +365,6 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       30,
     ),
     physicsStepRate: normalizePhysicsStepRate(candidate.physicsStepRate),
-    fpsLimit: normalizeFpsLimit(candidate.fpsLimit),
     physicsStrength: normalizeNumber(
       candidate.physicsStrength,
       defaults.physicsStrength,
