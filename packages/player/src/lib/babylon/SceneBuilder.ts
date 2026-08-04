@@ -30,6 +30,7 @@ import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
 import { PointLight } from "@babylonjs/core/Lights/pointLight";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { CreateGround } from "@babylonjs/core/Meshes/Builders/groundBuilder";
+import { CreateBox } from "@babylonjs/core/Meshes/Builders/boxBuilder";
 import type { GroundMesh } from "@babylonjs/core/Meshes/groundMesh";
 import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import type { BaseTexture } from "@babylonjs/core/Materials/Textures/baseTexture";
@@ -38,6 +39,9 @@ import { ShadowOnlyMaterial } from "@babylonjs/materials/shadowOnly";
 import HavokPhysics from "@babylonjs/havok";
 import havokWasmUrl from "@babylonjs/havok/lib/esm/HavokPhysics.wasm?url";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
+import { PhysicsAggregate } from "@babylonjs/core/Physics/v2/physicsAggregate";
+import { PhysicsShapeType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
+import { PhysicsImpostor } from "@babylonjs/core/Physics/v1/physicsImpostor";
 import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline";
 import { DepthOfFieldEffectBlurLevel } from "@babylonjs/core/PostProcesses/depthOfFieldEffect";
 import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
@@ -50,6 +54,17 @@ import type { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MmdEffectHost } from "./MmdEffectHost";
 import { MmdModelEffectHost } from "./MmdModelEffectHost";
 import { createFloorMirrorPlane } from "./mirror-plane";
+import {
+  createFloorColliderBox,
+  MMD_PHYSICS_COLLISION_MASK,
+} from "./floor-collider";
+import { getMeshGeometryBounds } from "./mesh-geometry-bounds";
+import {
+  fitWorkingFloorToMeshes,
+  inferWorkingFloorFit,
+  mergeMeshBounds,
+  type FloorFit,
+} from "./working-floor-fit";
 import { aggregateVmdPhysicsToggleWarnings } from "./vmd-loader-logging";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
@@ -661,6 +676,8 @@ export class SceneBuilder implements ISceneBuilder {
         this.resolveModelEffectUrl(relativePath),
     }).applyConventionalEmd();
 
+    this.setupFloorCollider(stageMesh);
+
     const physicsStrength = this.renderSettings.physicsStrength;
     if (physicsStrength !== 1) {
       // Scale the PMX joint spring stiffness before the physics model is
@@ -1193,6 +1210,92 @@ export class SceneBuilder implements ISceneBuilder {
       }
     }
     return matched;
+  }
+
+  private setupFloorCollider(stageMesh: MmdMesh | null): void {
+    const floor = this.inferPhysicsFloor(stageMesh);
+    const box = createFloorColliderBox(floor);
+    const collider = CreateBox(
+      "mmdFloorCollider",
+      { width: box.width, height: box.height, depth: box.depth },
+      this.scene,
+    );
+    collider.position.copyFromFloats(box.centerX, box.centerY, box.centerZ);
+    collider.isPickable = false;
+    collider.isVisible = false;
+
+    if (this.actualPhysicsBackend === "ammo") {
+      collider.physicsImpostor = new PhysicsImpostor(
+        collider,
+        PhysicsImpostor.BoxImpostor,
+        {
+          mass: 0,
+          friction: 0.5,
+          restitution: 0,
+          group: MMD_PHYSICS_COLLISION_MASK,
+          mask: MMD_PHYSICS_COLLISION_MASK,
+        } as ConstructorParameters<typeof PhysicsImpostor>[2],
+        this.scene,
+      );
+    } else {
+      const aggregate = new PhysicsAggregate(
+        collider,
+        PhysicsShapeType.BOX,
+        { mass: 0, friction: 0.5, restitution: 0 },
+        this.scene,
+      );
+      aggregate.shape.filterMembershipMask = MMD_PHYSICS_COLLISION_MASK;
+      aggregate.shape.filterCollideMask = MMD_PHYSICS_COLLISION_MASK;
+    }
+
+    console.info("[MMD physics] Added stage floor collider", {
+      backend: this.actualPhysicsBackend,
+      floorY: floor.y,
+      width: box.width,
+      depth: box.depth,
+    });
+  }
+
+  private inferPhysicsFloor(stageMesh: MmdMesh | null): FloorFit {
+    if (stageMesh === null) {
+      const groundBounds = this.ground?.getHierarchyBoundingVectors(true);
+      return groundBounds === undefined
+        ? { minX: -50, maxX: 50, minZ: -30, maxZ: 70, y: 0 }
+        : {
+            minX: groundBounds.min.x,
+            maxX: groundBounds.max.x,
+            minZ: groundBounds.min.z,
+            maxZ: groundBounds.max.z,
+            y: groundBounds.max.y,
+          };
+    }
+
+    const profile = this.stageRenderProfile;
+    const preferredFloorNames = [
+      ...(profile?.reflection?.materialNames ?? []),
+      ...(profile?.materials ?? [])
+        .flatMap(({ materialNames }) => materialNames)
+        .filter((name) => FLOOR_MATERIAL_NAME_PATTERN.test(name)),
+    ];
+    const preferredBounds = this.findStageMeshes(
+      stageMesh,
+      preferredFloorNames,
+    )
+      .map(getMeshGeometryBounds)
+      .filter((bounds) => bounds !== null);
+    const preferredFit = fitWorkingFloorToMeshes(preferredBounds);
+    if (preferredFit !== null) return preferredFit;
+
+    const stageGeometryBounds = stageMesh.metadata.meshes
+      .map(getMeshGeometryBounds)
+      .filter((bounds) => bounds !== null);
+    const stageBounds =
+      mergeMeshBounds(stageGeometryBounds) ??
+      (() => {
+        const hierarchy = stageMesh.getHierarchyBoundingVectors(true);
+        return { min: hierarchy.min, max: hierarchy.max };
+      })();
+    return inferWorkingFloorFit(stageBounds, stageGeometryBounds);
   }
 
   /**
