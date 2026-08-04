@@ -43,6 +43,7 @@ import { DepthOfFieldEffectBlurLevel } from "@babylonjs/core/PostProcesses/depth
 import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
 import { MirrorTexture } from "@babylonjs/core/Materials/Textures/mirrorTexture";
+import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { SSAORenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssaoRenderingPipeline";
 import { SSRRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline";
 import { Plane } from "@babylonjs/core/Maths/math.plane";
@@ -1032,6 +1033,7 @@ export class SceneBuilder implements ISceneBuilder {
     }
 
     this.applySupersamplingScale();
+    this.applyTextureFiltering();
 
     for (const state of this.materialStates) {
       const material = state.material;
@@ -1045,6 +1047,23 @@ export class SceneBuilder implements ISceneBuilder {
       material.toonTexture = settings.toonTextureEnabled
         ? state.toonTexture
         : null;
+    }
+  }
+
+  private applyTextureFiltering(): void {
+    const textures = new Set<BaseTexture>();
+    for (const state of this.materialStates) {
+      const diffuseTexture = state.material.diffuseTexture;
+      if (diffuseTexture !== null) textures.add(diffuseTexture);
+      if (state.sphereTexture !== null) textures.add(state.sphereTexture);
+    }
+
+    for (const texture of textures) {
+      if (texture.samplingMode !== Texture.TRILINEAR_SAMPLINGMODE) {
+        texture.updateSamplingMode(Texture.TRILINEAR_SAMPLINGMODE);
+      }
+      texture.anisotropicFilteringLevel =
+        this.renderSettings.textureAnisotropy;
     }
   }
 

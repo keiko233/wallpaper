@@ -135,6 +135,8 @@ export type ShadowFilteringMode = "pcf" | "pcss";
 
 export type SsrQualityLevel = "low" | "medium" | "high";
 
+export type TextureAnisotropyLevel = 1 | 4 | 8 | 16;
+
 /**
  * Physics backend. "ammo" (Bullet via Ammo.js) reproduces the original
  * MMD physics: PMX joint springs and per-body damping are honored, which
@@ -171,6 +173,8 @@ export interface MmdRenderSettings {
   qualityPreset: MmdQualityPreset;
   /** MSAA samples used by the rendering pipeline (1, 2, 4 or 8). */
   msaaSamples: number;
+  /** Anisotropic filtering level for MMD diffuse and sphere textures. */
+  textureAnisotropy: TextureAnisotropyLevel;
   /** Fast FXAA post-process applied on top of MSAA. */
   fxaaEnabled: boolean;
   /**
@@ -223,6 +227,7 @@ export interface MmdRenderSettings {
 /** Settings tuned by each quality preset. */
 export interface RenderQualityPresetSettings {
   msaaSamples: number;
+  textureAnisotropy: TextureAnisotropyLevel;
   shadowMapSize: number;
   shadowFiltering: ShadowFilteringMode;
   ssaoEnabled: boolean;
@@ -246,6 +251,7 @@ export const RENDER_QUALITY_PRESETS: Record<
 > = {
   performance: {
     msaaSamples: 1,
+    textureAnisotropy: 1,
     shadowMapSize: 1024,
     shadowFiltering: "pcf",
     ssaoEnabled: false,
@@ -264,6 +270,7 @@ export const RENDER_QUALITY_PRESETS: Record<
   },
   balanced: {
     msaaSamples: 2,
+    textureAnisotropy: 4,
     shadowMapSize: 1024,
     shadowFiltering: "pcf",
     ssaoEnabled: true,
@@ -282,6 +289,7 @@ export const RENDER_QUALITY_PRESETS: Record<
   },
   quality: {
     msaaSamples: 4,
+    textureAnisotropy: 8,
     shadowMapSize: 2048,
     shadowFiltering: "pcss",
     ssaoEnabled: true,
@@ -300,6 +308,7 @@ export const RENDER_QUALITY_PRESETS: Record<
   },
   ultra: {
     msaaSamples: 8,
+    textureAnisotropy: 16,
     shadowMapSize: 4096,
     shadowFiltering: "pcss",
     ssaoEnabled: true,
@@ -321,6 +330,7 @@ export const RENDER_QUALITY_PRESETS: Record<
 export const RENDER_QUALITY_PRESET_KEYS: readonly (keyof RenderQualityPresetSettings)[] =
   [
     "msaaSamples",
+    "textureAnisotropy",
     "shadowMapSize",
     "shadowFiltering",
     "ssaoEnabled",
@@ -364,6 +374,7 @@ export const DEFAULT_MMD_RENDER_SETTINGS: MmdRenderSettings = {
   toonTextureEnabled: true,
   qualityPreset: "quality",
   msaaSamples: 4,
+  textureAnisotropy: 8,
   fxaaEnabled: true,
   supersamplingScale: 1,
   shadowMapSize: 2048,

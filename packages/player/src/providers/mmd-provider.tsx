@@ -35,6 +35,7 @@ import {
   type SkyboxList,
   type SsrQualityLevel,
   type StageList,
+  type TextureAnisotropyLevel,
 } from "../types";
 import {
   DEFAULT_MODELS,
@@ -149,6 +150,14 @@ function normalizePhysicsBackend(value: unknown): MmdPhysicsBackend {
 
 function normalizePhysicsStepRate(value: unknown): number {
   return value === 30 || value === 120 ? value : 60;
+}
+
+function normalizeTextureAnisotropy(
+  value: unknown,
+): TextureAnisotropyLevel {
+  return value === 1 || value === 4 || value === 8 || value === 16
+    ? value
+    : DEFAULT_MMD_RENDER_SETTINGS.textureAnisotropy;
 }
 
 function normalizeRenderSettings(value: unknown): MmdRenderSettings {
@@ -270,6 +279,9 @@ function normalizeRenderSettings(value: unknown): MmdRenderSettings {
       defaults.msaaSamples,
       1,
       8,
+    ),
+    textureAnisotropy: normalizeTextureAnisotropy(
+      candidate.textureAnisotropy,
     ),
     fxaaEnabled: normalizeBoolean(
       candidate.fxaaEnabled,

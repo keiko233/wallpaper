@@ -40,6 +40,7 @@ import {
   applyRenderQualityPreset,
   getRenderQualityPreset,
   type MmdQualityPreset,
+  type TextureAnisotropyLevel,
 } from "../types";
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -58,6 +59,7 @@ const QUALITY_PRESET_LABELS: Record<MmdQualityPreset | "custom", string> = {
 };
 
 const MSAA_OPTIONS = [1, 2, 4, 8] as const;
+const TEXTURE_ANISOTROPY_OPTIONS = [1, 4, 8, 16] as const;
 const SUPERSAMPLING_OPTIONS = [1, 1.5, 2] as const;
 const SHADOW_MAP_OPTIONS = [1024, 2048, 4096] as const;
 const SSR_QUALITY_LABELS = {
@@ -925,6 +927,38 @@ export function MmdSettings({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Texture filtering</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (nextValue !== null) {
+                  setRenderSettings({
+                    textureAnisotropy: Number(
+                      nextValue,
+                    ) as TextureAnisotropyLevel,
+                  });
+                }
+              }}
+              value={String(renderSettings.textureAnisotropy)}
+            >
+              <SelectTrigger aria-label="Texture filtering quality">
+                <SelectValue>
+                  {renderSettings.textureAnisotropy}× anisotropic
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TEXTURE_ANISOTROPY_OPTIONS.map((level) => (
+                  <SelectItem key={level} value={String(level)}>
+                    {level}× anisotropic
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Sharpens angled and distant model or stage textures.
+            </p>
           </div>
 
           <SettingSwitch
