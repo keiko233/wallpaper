@@ -71,6 +71,7 @@ import {
 import type {
   CatalogSearchOutput,
   InstallProgress,
+  InstalledUpdateSummary,
   ResourceClient,
   ResourceSummary,
   InstalledResourceSummary,
@@ -244,6 +245,9 @@ export function ResourceLibrary({
   const [installedResources, setInstalledResources] = useState<
     InstalledResourceSummary[]
   >([]);
+  const [updates, setUpdates] = useState<
+    Map<string, InstalledUpdateSummary>
+  >(new Map());
   const [installing, setInstalling] = useState<{
     id: string;
     progress: InstallProgress;
@@ -299,7 +303,19 @@ export function ResourceLibrary({
   );
 
   const refreshInstalledResources = useCallback(async () => {
-    setInstalledResources(await client.listInstalled());
+    const [installed, available] = await Promise.all([
+      client.listInstalled(),
+      client.listAvailableUpdates(),
+    ]);
+    setInstalledResources(installed);
+    setUpdates(
+      new Map(
+        available.map((item) => [
+          item.installed.localResourceId,
+          item,
+        ]),
+      ),
+    );
   }, [client]);
 
   const search = useCallback(
@@ -401,6 +417,20 @@ export function ResourceLibrary({
     } finally {
       setDeletingResourceId(null);
     }
+  }
+
+  async function updateResource(item: InstalledUpdateSummary) {
+    setBrowseError(null);
+    await install(item.update);
+    await refreshInstalledResources();
+  }
+
+  async function updateAllResources() {
+    setBrowseError(null);
+    for (const item of [...updates.values()]) {
+      await install(item.update);
+    }
+    await refreshInstalledResources();
   }
 
   async function addSource(event: FormEvent<HTMLFormElement>) {
@@ -733,42 +763,107 @@ export function ResourceLibrary({
                     <AlertDescription>{browseError}</AlertDescription>
                   </Alert>
                 )}
+                {updates.size === 0 ? null : (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card/55 p-3 shadow-sm backdrop-blur-xl">
+                    <p className="text-muted-foreground text-sm">
+                      {updates.size === 1
+                        ? "1 update available"
+                        : `${updates.size} updates available`}{" "}
+                      — versions are refreshed from the catalog.
+                    </p>
+                    <Button
+                      disabled={installing !== null}
+                      onClick={() => void updateAllResources()}
+                      size="sm"
+                    >
+                      <RefreshCw />
+                      Update all
+                    </Button>
+                  </div>
+                )}
                 <div className="max-h-[55dvh] space-y-2 overflow-y-auto pe-1">
                   {installedResources.length === 0 ? (
                     <p className="rounded-xl border border-dashed py-10 text-center text-muted-foreground text-sm">
                       No resources are installed on this device.
                     </p>
                   ) : null}
-                  {installedResources.map((item) => (
-                    <ResourceCard
-                      action={
-                        <Button
-                          loading={deletingResourceId === item.localResourceId}
-                          onClick={() =>
-                            setResourceToDelete({
-                              id: item.localResourceId,
-                              name: item.name,
-                            })
-                          }
-                          size="sm"
-                          variant="destructive-outline"
-                        >
-                          <Trash2 />
-                          Delete
-                        </Button>
-                      }
-                      key={item.localResourceId}
-                      resource={item}
-                      sourceAvailable={item.sourceAvailable}
-                    >
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>Version {item.version}</span>
-                        {item.ready ? null : (
-                          <Badge variant="warning">Incomplete</Badge>
+                  {installedResources.map((item) => {
+                    const update = updates.get(item.localResourceId);
+                    const progress =
+                      installing?.id === item.localResourceId
+                        ? installing.progress
+                        : null;
+                    return (
+                      <ResourceCard
+                        action={
+                          <>
+                            {update === undefined ? null : (
+                              <Button
+                                disabled={installing !== null}
+                                loading={progress !== null}
+                                onClick={() =>
+                                  void updateResource(update)
+                                }
+                                size="sm"
+                                variant="outline"
+                              >
+                                <RefreshCw />
+                                Update
+                              </Button>
+                            )}
+                            <Button
+                              loading={deletingResourceId === item.localResourceId}
+                              onClick={() =>
+                                setResourceToDelete({
+                                  id: item.localResourceId,
+                                  name: item.name,
+                                })
+                              }
+                              size="sm"
+                              variant="destructive-outline"
+                            >
+                              <Trash2 />
+                              Delete
+                            </Button>
+                          </>
+                        }
+                        key={item.localResourceId}
+                        resource={item}
+                        sourceAvailable={item.sourceAvailable}
+                      >
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>Version {item.version}</span>
+                          {update === undefined ? null : (
+                            <Badge variant="info">
+                              <RefreshCw />
+                              Update available: v{item.version} → v
+                              {update.update.version}
+                            </Badge>
+                          )}
+                          {item.ready ? null : (
+                            <Badge variant="warning">Incomplete</Badge>
+                          )}
+                        </div>
+                        {progress === null ? null : (
+                          <div className="mt-3 space-y-1.5">
+                            <Progress
+                              value={
+                                progress.loaded !== undefined &&
+                                progress.total !== undefined &&
+                                progress.total > 0
+                                  ? (progress.loaded / progress.total) *
+                                    100
+                                  : null
+                              }
+                            />
+                            <p className="text-muted-foreground text-xs">
+                              {getProgressLabel(progress)}
+                            </p>
+                          </div>
                         )}
-                      </div>
-                    </ResourceCard>
-                  ))}
+                      </ResourceCard>
+                    );
+                  })}
                 </div>
               </TabsPanel>
 

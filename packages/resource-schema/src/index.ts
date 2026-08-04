@@ -366,6 +366,14 @@ function validateStageRenderProfile(
   }
 }
 
+const SELECTABLE_ENTRYPOINT_KINDS: ReadonlySet<string> = new Set([
+  "model",
+  "stage",
+  "skybox",
+  "motion",
+  "camera",
+]);
+
 function validateEntrypointVariantKinds(
   value: {
     kind: z.infer<typeof ResourceKindSchema>;
@@ -377,16 +385,11 @@ function validateEntrypointVariantKinds(
     value.artifact.entrypoints,
   )) {
     const first = Array.isArray(entrypoint) ? entrypoint[0] : undefined;
-    if (
-      typeof first === "object" &&
-      value.kind !== "model" &&
-      value.kind !== "stage" &&
-      value.kind !== "skybox"
-    ) {
+    if (typeof first === "object" && !SELECTABLE_ENTRYPOINT_KINDS.has(value.kind)) {
       context.addIssue({
         code: "custom",
         message:
-          "Selectable entrypoint variants are currently supported only for model, stage, and skybox resources.",
+          "Selectable entrypoint variants are currently supported only for model, stage, skybox, motion, and camera resources.",
         path: ["artifact", "entrypoints", key],
       });
       continue;

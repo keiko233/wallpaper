@@ -91,6 +91,40 @@ function resolvePaths(
   return resolved;
 }
 
+function resolveVariantEntrypoints(
+  entrypoints: ArtifactEntrypoints,
+  keys: string[],
+  paths: string[],
+  extensions: string[],
+  multiple: boolean,
+): ResolvedArtifactEntrypoint[] {
+  const configured = configuredEntrypointOptions(entrypoints, keys);
+  const resolved =
+    configured.length > 0
+      ? configured
+      : [
+          {
+            id: null,
+            name: null,
+            paths: inferPaths(paths, extensions, multiple),
+            isDefault: true,
+          },
+        ];
+  const available = new Set(paths);
+  for (const entrypoint of resolved) {
+    const missing = entrypoint.paths.find((path) => !available.has(path));
+    if (missing !== undefined) {
+      throw new Error(`Artifact entrypoint does not exist: ${missing}`);
+    }
+  }
+  if (resolved.length === 0) {
+    throw new Error(
+      `Artifact has no compatible ${keys.join("/")} entrypoint.`,
+    );
+  }
+  return resolved;
+}
+
 function resolveSelectableEntrypoints(
   entrypoints: ArtifactEntrypoints,
   keys: string[],
@@ -289,16 +323,17 @@ export async function materializeLibrary(
         break;
       }
       case "motion": {
-        const motionPath = resolvePaths(
+        const motionOptions = resolveVariantEntrypoints(
           files.entrypoints,
           ["motions", "motion"],
           files.paths,
           [".vmd", ".bvmd"],
           true,
-        ).map((path) => files.virtualUrls.get(path)!);
+        );
 
         let audioPath: string | undefined;
-        let cameraPath: string | undefined;
+        let cameraFiles: VersionFiles | undefined;
+        let cameraOptions: ResolvedArtifactEntrypoint[] | undefined;
 
         const dependencyRows = await database.resourceDependencies
           .where("parentVersionId")
@@ -316,11 +351,17 @@ export async function materializeLibrary(
               [".mp3", ".ogg", ".wav", ".m4a", ".aac", ".flac"],
             );
           } else if (dependency.binding === "camera") {
-            cameraPath = resolveVirtualUrl(
-              dependencyFiles,
+            cameraFiles = dependencyFiles;
+            cameraOptions = resolveVariantEntrypoints(
+              dependencyFiles.entrypoints,
               ["camera"],
+              dependencyFiles.paths,
               [".vmd", ".bvmd"],
-            );
+              false,
+            ).map((entrypoint) => ({
+              ...entrypoint,
+              paths: entrypoint.paths.slice(0, 1),
+            }));
           }
         }
 
@@ -331,14 +372,46 @@ export async function materializeLibrary(
           continue;
         }
 
-        resources.motions.push({
-          id,
-          name: resource.name,
-          motionPath,
-          audioPath,
-          cameraPath,
-          remark: resource.description ?? undefined,
-        });
+        const cameraOptionsOrNull = cameraOptions ?? [null];
+        for (const motionOption of motionOptions) {
+          const motionPath = motionOption.paths.map(
+            (path) => files.virtualUrls.get(path)!,
+          );
+          for (const cameraOption of cameraOptionsOrNull) {
+            const variantIds = [
+              motionOption.id,
+              cameraOption?.id ?? null,
+            ].filter((id): id is string => id !== null);
+            const hasVariants = variantIds.length > 0;
+            resources.motions.push({
+              id: hasVariants
+                ? `${id}:${variantIds.join(":")}`
+                : id,
+              name:
+                motionOption.id !== null &&
+                cameraOption !== null &&
+                cameraOption.id !== null
+                  ? `${motionOption.name ?? resource.name} · ${cameraOption.name ?? ""}`
+                  : (motionOption.name ??
+                    cameraOption?.name ??
+                    resource.name),
+              motionPath,
+              audioPath,
+              cameraPath:
+                cameraOption === null
+                  ? undefined
+                  : cameraFiles?.virtualUrls.get(
+                      cameraOption.paths[0]!,
+                    ),
+              ...(hasVariants ? { group: resource.name } : {}),
+              remark:
+                motionOption.remark ??
+                cameraOption?.remark ??
+                resource.description ??
+                undefined,
+            });
+          }
+        }
         break;
       }
       case "stage": {

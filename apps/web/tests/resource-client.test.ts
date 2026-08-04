@@ -952,6 +952,109 @@ describe("ResourceClient install and source removal", () => {
     cache.close();
   });
 
+  it("reports updates available from the catalog and installs them", async () => {
+    const options = createDatabaseOptions();
+    const database = new WallpaperClientDatabase(
+      "available-updates",
+      options,
+    );
+    const cache = new WallpaperCacheDatabase(
+      "available-updates-cache",
+      options,
+    );
+
+    const blobV1 = new Blob(["v1-payload"]);
+    const blobV2 = new Blob(["v2-payload"]);
+    const shaV1 = await sha256Hex(blobV1);
+    const shaV2 = await sha256Hex(blobV2);
+
+    let revision = "a".repeat(64);
+    let resources: CatalogResource[] = [
+      makeResource(
+        "up-motion",
+        "1.0.0",
+        "motion",
+        "Up Motion",
+        shaV1,
+        blobV1.size,
+      ),
+    ];
+    const fetcher = ((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url.endsWith(".bin")) {
+        return Promise.resolve(
+          new Response(revision === "b".repeat(64) ? blobV2 : blobV1),
+        );
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            schemaVersion: 1,
+            revision,
+            resources,
+          }),
+          { headers: { "content-type": "application/json" } },
+        ),
+      );
+    }) as typeof fetch;
+
+    const service = createSourceService(database, fetcher, null);
+    await service.add("https://updates.example.com/");
+    const client = createClient(database, cache, service, fetcher);
+
+    const v1Search = await client.search({});
+    const v1Item = v1Search.items.find(
+      (item) => item.id === "up-motion",
+    );
+    expect(v1Item).toBeDefined();
+    await client.install(v1Item!, () => undefined);
+
+    expect(await client.listAvailableUpdates()).toEqual([]);
+
+    revision = "b".repeat(64);
+    resources = [
+      makeResource(
+        "up-motion",
+        "1.1.0",
+        "motion",
+        "Up Motion",
+        shaV2,
+        blobV2.size,
+      ),
+    ];
+    await client.search({});
+
+    const updates = await client.listAvailableUpdates();
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.installed).toEqual(
+      expect.objectContaining({
+        upstreamId: "up-motion",
+        version: "1.0.0",
+      }),
+    );
+    expect(updates[0]?.update).toEqual(
+      expect.objectContaining({
+        id: "up-motion",
+        version: "1.1.0",
+      }),
+    );
+
+    await client.install(updates[0]!.update, () => undefined);
+
+    const installed = await client.listInstalled();
+    expect(
+      installed.find((item) => item.upstreamId === "up-motion"),
+    ).toEqual(
+      expect.objectContaining({
+        version: "1.1.0",
+      }),
+    );
+    expect(await client.listAvailableUpdates()).toEqual([]);
+
+    database.close();
+    cache.close();
+  });
+
   it("hides dependency-only resources from default search", async () => {
     const options = createDatabaseOptions();
     const database = new WallpaperClientDatabase(

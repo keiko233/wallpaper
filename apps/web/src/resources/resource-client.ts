@@ -70,6 +70,7 @@ export interface CatalogSearchOutput {
 export interface InstalledResourceSummary {
   localResourceId: string;
   localVersionId: string;
+  upstreamId: string;
   name: string;
   kind: ResourceKind;
   version: string;
@@ -82,6 +83,11 @@ export interface InstalledResourceSummary {
   coverUrl: string | null;
   addedAt: string;
   ready: boolean;
+}
+
+export interface InstalledUpdateSummary {
+  installed: InstalledResourceSummary;
+  update: ResourceSummary;
 }
 
 export function makeLocalResourceId(
@@ -845,6 +851,7 @@ export class ResourceClient {
         return {
           localResourceId: resource.id,
           localVersionId: version.id,
+          upstreamId: resource.upstreamId,
           name: resource.name,
           kind: resource.kind,
           version: version.upstreamVersion,
@@ -869,6 +876,50 @@ export class ResourceClient {
           right.addedAt.localeCompare(left.addedAt) ||
           left.name.localeCompare(right.name),
       );
+  }
+
+  async listAvailableUpdates(): Promise<InstalledUpdateSummary[]> {
+    const installed = await this.listInstalled();
+    const sourceIds = [
+      ...new Set(installed.map((item) => item.sourceId)),
+    ];
+    const catalogs =
+      sourceIds.length === 0
+        ? []
+        : await this.database.sourceCatalogs
+            .where("sourceId")
+            .anyOf(sourceIds)
+            .toArray();
+    const catalogBySource = new Map(
+      catalogs.map((catalog) => [catalog.sourceId, catalog.catalog]),
+    );
+    const updates: InstalledUpdateSummary[] = [];
+    for (const item of installed) {
+      const catalog = catalogBySource.get(item.sourceId);
+      if (catalog === undefined) continue;
+      const catalogResource = catalog.resources.find(
+        (resource) =>
+          resource.id === item.upstreamId &&
+          resource.visibility !== "dependency-only",
+      );
+      if (catalogResource === undefined) continue;
+      if (catalogResource.version === item.version) continue;
+      const source = await this.database.resourceSources.get(
+        item.sourceId,
+      );
+      if (source === undefined) continue;
+      updates.push({
+        installed: item,
+        update: toResourceSummary(
+          source,
+          { revision: catalog.revision },
+          catalogResource,
+        ),
+      });
+    }
+    return updates.sort((left, right) =>
+      left.installed.name.localeCompare(right.installed.name),
+    );
   }
 
   async uninstall(resourceId: string): Promise<void> {

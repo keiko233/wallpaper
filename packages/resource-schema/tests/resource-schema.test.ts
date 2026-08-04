@@ -1160,7 +1160,39 @@ describe("resource schema", () => {
           },
         },
       }),
-    ).toThrow(/only for model, stage, and skybox/u);
+    ).toThrow(
+      /only for model, stage, skybox, motion, and camera/u,
+    );
+  });
+
+  it("accepts selectable entrypoint variants for motion and camera", () => {
+    const motionVariants = [
+      { id: "default", name: "Default", path: "motion.vmd", default: true },
+      { id: "tda", name: "Tda式", path: "motion Tda式.vmd" },
+    ];
+    const cameraVariants = [
+      { id: "140cm", name: "140cm", path: "camera 140cm.vmd", default: true },
+      { id: "160cm", name: "160cm", path: "camera 160cm.vmd" },
+    ];
+    expect(
+      ResourceManifestSchema.parse({
+        ...definition,
+        artifact: {
+          ...definition.artifact,
+          entrypoints: { motions: motionVariants },
+        },
+      }),
+    ).toBeDefined();
+    expect(
+      ResourceManifestSchema.parse({
+        ...definition,
+        kind: "camera",
+        artifact: {
+          ...definition.artifact,
+          entrypoints: { camera: cameraVariants },
+        },
+      }),
+    ).toBeDefined();
   });
 });
 

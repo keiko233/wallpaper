@@ -5,6 +5,8 @@ export interface MotionList {
   audioPath: string;
   cameraPath?: string;
   cameraDelaySeconds?: number;
+  /** Display group (source resource) when the motion has selectable variants. */
+  group?: string;
   remark?: string;
 }
 
