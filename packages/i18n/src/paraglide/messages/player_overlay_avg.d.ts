@@ -1,0 +1,16 @@
+/**
+* | output |
+* | --- |
+* | "AVG" |
+*
+* @param {Player_Overlay_AvgInputs} inputs
+* @param {{ locale?: "en" | "zh" }} options
+* @returns {LocalizedString}
+*/
+export const player_overlay_avg: ((inputs?: Player_Overlay_AvgInputs, options?: {
+    locale?: "en" | "zh";
+}) => LocalizedString) & import("../runtime.js").MessageMetadata<Player_Overlay_AvgInputs, {
+    locale?: "en" | "zh";
+}, {}>;
+export type LocalizedString = import("../runtime.js").LocalizedString;
+export type Player_Overlay_AvgInputs = {};

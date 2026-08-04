@@ -1,0 +1,16 @@
+/**
+* | output |
+* | --- |
+* | "ACES tone mapping keeps bright areas filmic and controlled." |
+*
+* @param {Player_Settings_Filmic_Tone_Mapping_DescriptionInputs} inputs
+* @param {{ locale?: "en" | "zh" }} options
+* @returns {LocalizedString}
+*/
+export const player_settings_filmic_tone_mapping_description: ((inputs?: Player_Settings_Filmic_Tone_Mapping_DescriptionInputs, options?: {
+    locale?: "en" | "zh";
+}) => LocalizedString) & import("../runtime.js").MessageMetadata<Player_Settings_Filmic_Tone_Mapping_DescriptionInputs, {
+    locale?: "en" | "zh";
+}, {}>;
+export type LocalizedString = import("../runtime.js").LocalizedString;
+export type Player_Settings_Filmic_Tone_Mapping_DescriptionInputs = {};

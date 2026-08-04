@@ -1,0 +1,16 @@
+/**
+* | output |
+* | --- |
+* | "Ready · preparing next item" |
+*
+* @param {Player_Settings_Ready_Preparing_NextInputs} inputs
+* @param {{ locale?: "en" | "zh" }} options
+* @returns {LocalizedString}
+*/
+export const player_settings_ready_preparing_next: ((inputs?: Player_Settings_Ready_Preparing_NextInputs, options?: {
+    locale?: "en" | "zh";
+}) => LocalizedString) & import("../runtime.js").MessageMetadata<Player_Settings_Ready_Preparing_NextInputs, {
+    locale?: "en" | "zh";
+}, {}>;
+export type LocalizedString = import("../runtime.js").LocalizedString;
+export type Player_Settings_Ready_Preparing_NextInputs = {};

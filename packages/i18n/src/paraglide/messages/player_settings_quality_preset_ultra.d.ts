@@ -1,0 +1,16 @@
+/**
+* | output |
+* | --- |
+* | "Ultra" |
+*
+* @param {Player_Settings_Quality_Preset_UltraInputs} inputs
+* @param {{ locale?: "en" | "zh" }} options
+* @returns {LocalizedString}
+*/
+export const player_settings_quality_preset_ultra: ((inputs?: Player_Settings_Quality_Preset_UltraInputs, options?: {
+    locale?: "en" | "zh";
+}) => LocalizedString) & import("../runtime.js").MessageMetadata<Player_Settings_Quality_Preset_UltraInputs, {
+    locale?: "en" | "zh";
+}, {}>;
+export type LocalizedString = import("../runtime.js").LocalizedString;
+export type Player_Settings_Quality_Preset_UltraInputs = {};

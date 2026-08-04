@@ -1,0 +1,16 @@
+/**
+* | output |
+* | --- |
+* | "RTSS-style frame time monitor over the wallpaper. Toggle it anytime with the" |
+*
+* @param {Player_Settings_Fps_Overlay_DescriptionInputs} inputs
+* @param {{ locale?: "en" | "zh" }} options
+* @returns {LocalizedString}
+*/
+export const player_settings_fps_overlay_description: ((inputs?: Player_Settings_Fps_Overlay_DescriptionInputs, options?: {
+    locale?: "en" | "zh";
+}) => LocalizedString) & import("../runtime.js").MessageMetadata<Player_Settings_Fps_Overlay_DescriptionInputs, {
+    locale?: "en" | "zh";
+}, {}>;
+export type LocalizedString = import("../runtime.js").LocalizedString;
+export type Player_Settings_Fps_Overlay_DescriptionInputs = {};
