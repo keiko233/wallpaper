@@ -1,7 +1,6 @@
 {
   "common_language": "语言",
-  "common_locale_en": "English",
-  "common_locale_zh": "简体中文",
+  "common_current_language": "简体中文",
   "common_previous": "上一项",
   "common_next": "下一项",
   "ui_close": "关闭",
@@ -259,5 +258,9 @@
   "library_delete_installed_resources": "删除已安装资源",
   "library_delete_resource_title": "删除 {name}？",
   "library_delete_resource_description": "这会将资源从播放器中移除，并在其本地文件未被其他已安装资源共享时删除。资源来源仍会保留配置。",
-  "library_delete_resource": "删除资源"
+  "library_delete_resource": "删除资源",
+  "web_eula_title": "社区资源使用协议",
+  "web_eula_description": "默认资源来源提供由社区第三方贡献的资源，使用前请仔细阅读以下协议。",
+  "web_eula_accept": "同意并继续",
+  "web_eula_decline": "拒绝"
 }

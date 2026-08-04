@@ -1,4 +1,4 @@
-import { m } from "@wallpaper/i18n";
+import { locales, m } from "@wallpaper/i18n";
 import { setLocale, useLocale } from "@wallpaper/i18n";
 import { Label } from "@wallpaper/ui/label";
 import {
@@ -9,11 +9,13 @@ import {
   SelectValue,
 } from "@wallpaper/ui/select";
 
-export function LocaleSwitcher() {
+export function LocaleSwitcher({ showLabel = true }: {
+  showLabel?: boolean;
+}) {
   const locale = useLocale();
   return (
     <div className="space-y-2">
-      <Label>{m.common_language()}</Label>
+      {showLabel ? <Label>{m.common_language()}</Label> : null}
       <Select
         onValueChange={(value) => {
           if (value !== null) setLocale(value);
@@ -21,11 +23,18 @@ export function LocaleSwitcher() {
         value={locale}
       >
         <SelectTrigger aria-label={m.common_language()}>
-          <SelectValue />
+          <SelectValue>
+            {m.common_current_language()}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="en">{m.common_locale_en()}</SelectItem>
-          <SelectItem value="zh">{m.common_locale_zh()}</SelectItem>
+          {locales.map((locale) => (
+            <SelectItem key={locale} value={locale}>
+              {m.common_current_language(undefined, {
+                locale
+              })}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     </div>

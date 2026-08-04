@@ -7,6 +7,7 @@
     ".": "./src/app.tsx",
     "./context": "./src/providers/mmd-context.ts",
     "./defaults": "./src/defaults.ts",
+    "./locale-switcher": "./src/components/locale-switcher.tsx",
     "./resource-url": "./src/lib/resource-url.ts",
     "./styles.css": "./src/styles.css",
     "./types": "./src/types.ts"

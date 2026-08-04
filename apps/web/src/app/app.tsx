@@ -5,12 +5,17 @@ import {
 import { createPlayerPersistence } from "../db/player-persistence";
 import Player from "@wallpaper/player";
 import { m, useLocale } from "@wallpaper/i18n";
-import { AlertCircle, Library } from "lucide-react";
 import {
+  AlertCircle,
+  Library,
+} from "lucide-react";
+import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
+import { useLocalStorage } from "react-use";
 import {
   Alert,
   AlertDescription,
@@ -33,6 +38,11 @@ import type {
   BundledPlayerResources,
   WallpaperClientAppProps,
 } from "./types";
+import {
+  EULA_STORAGE_KEY,
+  EulaDialog,
+  type EulaDecision,
+} from "./eula-dialog";
 
 const EMPTY_BUNDLED_RESOURCES: BundledPlayerResources = {
   models: [],
@@ -61,13 +71,22 @@ export default function WallpaperClientApp({
   const [materializeError, setMaterializeError] = useState<
     string | null
   >(null);
+  const [eulaDecision, setEulaDecision] = useLocalStorage<EulaDecision>(
+    EULA_STORAGE_KEY,
+    "pending",
+    { raw: true },
+  );
 
+  const defaultSourceEnabled =
+    defaultSourceUrl !== null && eulaDecision === "accepted";
   const sourceService = useMemo(
     () =>
       new ResourceSourceService(database, {
-        defaultSourceUrl,
+        defaultSourceUrl: defaultSourceEnabled
+          ? defaultSourceUrl
+          : null,
       }),
-    [database, defaultSourceUrl],
+    [database, defaultSourceEnabled, defaultSourceUrl],
   );
   const client = useMemo(
     () => new ResourceClient(database, cache, sourceService),
@@ -118,6 +137,14 @@ export default function WallpaperClientApp({
     [database, materialized],
   );
 
+  const acceptEula = useCallback(() => {
+    setEulaDecision("accepted");
+  }, [setEulaDecision]);
+
+  const declineEula = useCallback(() => {
+    setEulaDecision("declined");
+  }, [setEulaDecision]);
+
   return (
     <main className="relative min-h-dvh overflow-hidden bg-transparent">
       <Player
@@ -136,6 +163,11 @@ export default function WallpaperClientApp({
         skyboxes={materialized.skyboxes}
         stages={materialized.stages}
       />
+
+      {defaultSourceUrl !== null &&
+      eulaDecision === "pending" ? (
+        <EulaDialog onAccept={acceptEula} onDecline={declineEula} />
+      ) : null}
 
       {materializeError === null ? null : (
         <Alert

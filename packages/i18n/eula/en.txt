@@ -1,0 +1,15 @@
+Community Resource Usage Agreement
+
+This software may load resources from community third-party sources, including but not limited to 3D models, motions, stages, skyboxes, textures, and action scripts, which are contributed by individual creators or third-party communities.
+
+1. Third-party and community resources are not created, endorsed, or reviewed by us. We cannot guarantee their quality, safety, or legality.
+
+2. Some resources may contain copyrighted, trademarked, or otherwise protected content and may infringe the rights of third parties.
+
+3. You agree to use such resources solely for personal learning, research, and evaluation purposes. Any commercial use, redistribution, or public display of these resources is entirely at your own risk and responsibility.
+
+4. You assume all risks associated with using these resources, including but not limited to infringement liability, data loss, and device damage. We shall not be liable for any loss or damage arising from your use of these resources.
+
+5. If you believe any resource infringes your rights, you may remove or disable the corresponding resource source at any time, and we will cooperate with removal requests where applicable.
+
+By clicking "I agree", you acknowledge that you have read, understood, and agreed to the terms above.

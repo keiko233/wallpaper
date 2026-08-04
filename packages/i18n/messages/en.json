@@ -1,7 +1,6 @@
 {
   "common_language": "Language",
-  "common_locale_en": "English",
-  "common_locale_zh": "简体中文",
+  "common_current_language": "English",
   "common_previous": "Previous",
   "common_next": "Next",
   "ui_close": "Close",
@@ -259,5 +258,9 @@
   "library_delete_installed_resources": "Delete installed resources",
   "library_delete_resource_title": "Delete {name}?",
   "library_delete_resource_description": "This removes the resource from the player and deletes its local files when they are not shared by another installed resource. The resource source remains configured.",
-  "library_delete_resource": "Delete resource"
+  "library_delete_resource": "Delete resource",
+  "web_eula_title": "Community Resource Usage Agreement",
+  "web_eula_description": "The default resource source provides resources contributed by community third parties. Please review the agreement below before using it.",
+  "web_eula_accept": "I agree",
+  "web_eula_decline": "Decline"
 }
