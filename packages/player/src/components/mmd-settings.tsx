@@ -41,10 +41,24 @@ import { useEffect, useState } from "react";
 import {
   applyRenderQualityPreset,
   getRenderQualityPreset,
+  LYRICS_DARK_THEME,
+  LYRICS_LIGHT_THEME,
+  type LyricsColorMode,
   type MmdQualityPreset,
   type PlanarReflectionTextureSize,
   type TextureAnisotropyLevel,
 } from "../types";
+
+const COLOR_MODE_LABELS: Record<LyricsColorMode, () => string> = {
+  manual: () => m.player_settings_lyrics_color_mode_manual(),
+  scene: () => m.player_settings_lyrics_color_mode_scene(),
+  dark: () => m.player_settings_lyrics_color_mode_dark(),
+  light: () => m.player_settings_lyrics_color_mode_light(),
+};
+
+function colorModeLabel(mode: LyricsColorMode): string {
+  return COLOR_MODE_LABELS[mode]();
+}
 
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const MATERIAL_RENDER_MODE_LABELS: Record<
@@ -204,6 +218,41 @@ function SettingSwitch({
   );
 }
 
+function SettingColor({
+  label,
+  value,
+  disabled = false,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Label
+      className={cn(
+        "flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2",
+        disabled && "opacity-50",
+      )}
+    >
+      {label}
+      <span
+        className="size-7 rounded-md border shadow-xs"
+        style={{ backgroundColor: value }}
+      />
+      <input
+        aria-label={label}
+        className="sr-only"
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.value)}
+        type="color"
+        value={value}
+      />
+    </Label>
+  );
+}
+
 function formatOverlayFps(value: number): string {
   return value >= 100 ? value.toFixed(0) : value.toFixed(1);
 }
@@ -323,6 +372,8 @@ export function MmdSettings({
     error,
     volume,
     playbackRate,
+    lyricsVisible,
+    lyricsSettings,
     renderSettings,
     playlist,
     playlistIndex,
@@ -344,6 +395,8 @@ export function MmdSettings({
     setBackground,
     setVolume,
     setPlaybackRate,
+    setLyricsVisible,
+    setLyricsSettings,
     previousPlaylistItem,
     nextPlaylistItem,
     setRenderSettings,
@@ -352,6 +405,27 @@ export function MmdSettings({
   const { overlayVisible, setOverlayVisible } = useMmdPerformance();
 
   const colorValue = background.slice(0, 7);
+
+  // Applying a dark/light mode also applies that theme's whole color set;
+  // picking either manually switches the mode back to "manual".
+  const applyLyricsColorMode = (mode: LyricsColorMode): void => {
+    if (mode === "dark") {
+      setLyricsSettings({ colorMode: "dark", ...LYRICS_DARK_THEME });
+    } else if (mode === "light") {
+      setLyricsSettings({ colorMode: "light", ...LYRICS_LIGHT_THEME });
+    } else {
+      setLyricsSettings({ colorMode: mode });
+    }
+  };
+  const applyLyricsKaraokeMode = (mode: LyricsColorMode): void => {
+    if (mode === "dark") {
+      setLyricsSettings({ karaokeMode: "dark", ...LYRICS_DARK_THEME });
+    } else if (mode === "light") {
+      setLyricsSettings({ karaokeMode: "light", ...LYRICS_LIGHT_THEME });
+    } else {
+      setLyricsSettings({ karaokeMode: mode });
+    }
+  };
 
   // The physics limit and strength commit only on release; committing per
   // drag tick would trigger a scene reload for every step.
@@ -546,6 +620,240 @@ export function MmdSettings({
           </TabsPanel>
 
           <TabsPanel className="space-y-4 pt-2" value="look">
+        <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
+          <div>
+            <SettingHeading title={m.player_settings_lyrics()} />
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {m.player_settings_lyrics_style_description()}
+            </p>
+          </div>
+
+          <SettingSwitch
+            checked={lyricsVisible}
+            description={m.player_settings_show_lyrics_description()}
+            label={m.player_settings_show_lyrics()}
+            onCheckedChange={setLyricsVisible}
+          />
+
+          <div className="space-y-2">
+            <Label>{m.player_settings_lyrics_color_mode()}</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (
+                  nextValue === "manual" ||
+                  nextValue === "scene" ||
+                  nextValue === "dark" ||
+                  nextValue === "light"
+                ) {
+                  applyLyricsColorMode(nextValue);
+                }
+              }}
+              value={lyricsSettings.colorMode}
+            >
+              <SelectTrigger aria-label={m.player_settings_lyrics_color_mode()}>
+                <SelectValue>
+                  {colorModeLabel(lyricsSettings.colorMode)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">{m.player_settings_lyrics_color_mode_manual()}</SelectItem>
+                <SelectItem value="scene">{m.player_settings_lyrics_color_mode_scene()}</SelectItem>
+                <SelectItem value="dark">{m.player_settings_lyrics_color_mode_dark()}</SelectItem>
+                <SelectItem value="light">{m.player_settings_lyrics_color_mode_light()}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <SettingColor
+            disabled={lyricsSettings.colorMode !== "manual"}
+            label={m.player_settings_lyrics_font_color()}
+            onChange={(value) =>
+              setLyricsSettings({ colorMode: "manual", fontColor: value })
+            }
+            value={lyricsSettings.fontColor}
+          />
+          <SettingSlider
+            formatValue={(value) => `${value.toFixed(2)}×`}
+            label={m.player_settings_lyrics_font_size()}
+            max={2}
+            min={0.6}
+            onChange={(value) => setLyricsSettings({ fontSize: value })}
+            step={0.05}
+            value={lyricsSettings.fontSize}
+          />
+          <SettingSlider
+            formatValue={(value) => `${Math.round(value)}`}
+            label={m.player_settings_lyrics_font_weight()}
+            max={900}
+            min={100}
+            onChange={(value) => setLyricsSettings({ fontWeight: value })}
+            step={100}
+            value={lyricsSettings.fontWeight}
+          />
+          <div className="space-y-2">
+            <Label>{m.player_settings_lyrics_font_family()}</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (
+                  nextValue === "system" ||
+                  nextValue === "sans" ||
+                  nextValue === "serif" ||
+                  nextValue === "monospace"
+                ) {
+                  setLyricsSettings({ fontFamily: nextValue });
+                }
+              }}
+              value={lyricsSettings.fontFamily}
+            >
+              <SelectTrigger aria-label={m.player_settings_lyrics_font_family()}>
+                <SelectValue>
+                  {lyricsSettings.fontFamily === "sans"
+                    ? m.player_settings_lyrics_font_sans()
+                    : lyricsSettings.fontFamily === "serif"
+                      ? m.player_settings_lyrics_font_serif()
+                      : lyricsSettings.fontFamily === "monospace"
+                        ? m.player_settings_lyrics_font_monospace()
+                        : m.player_settings_lyrics_font_system()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">{m.player_settings_lyrics_font_system()}</SelectItem>
+                <SelectItem value="sans">{m.player_settings_lyrics_font_sans()}</SelectItem>
+                <SelectItem value="serif">{m.player_settings_lyrics_font_serif()}</SelectItem>
+                <SelectItem value="monospace">{m.player_settings_lyrics_font_monospace()}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <SettingSlider
+            formatValue={(value) => `${value.toFixed(1)}px`}
+            label={m.player_settings_lyrics_letter_spacing()}
+            max={8}
+            min={-2}
+            onChange={(value) => setLyricsSettings({ letterSpacing: value })}
+            step={0.5}
+            value={lyricsSettings.letterSpacing}
+          />
+          <SettingSlider
+            formatValue={(value) => `${Math.round(value * 100)}%`}
+            label={m.player_settings_lyrics_opacity()}
+            max={1}
+            min={0.1}
+            onChange={(value) => setLyricsSettings({ opacity: value })}
+            step={0.05}
+            value={lyricsSettings.opacity}
+          />
+          <SettingSwitch
+            checked={lyricsSettings.karaoke}
+            description={m.player_settings_lyrics_karaoke_description()}
+            label={m.player_settings_lyrics_karaoke()}
+            onCheckedChange={(checked) =>
+              setLyricsSettings({ karaoke: checked })
+            }
+          />
+          {lyricsSettings.karaoke && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>{m.player_settings_lyrics_karaoke_mode()}</Label>
+                <Select
+                  onValueChange={(nextValue) => {
+                    if (
+                      nextValue === "manual" ||
+                      nextValue === "scene" ||
+                      nextValue === "dark" ||
+                      nextValue === "light"
+                    ) {
+                      applyLyricsKaraokeMode(nextValue);
+                    }
+                  }}
+                  value={lyricsSettings.karaokeMode}
+                >
+                  <SelectTrigger aria-label={m.player_settings_lyrics_karaoke_mode()}>
+                    <SelectValue>
+                      {colorModeLabel(lyricsSettings.karaokeMode)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">{m.player_settings_lyrics_color_mode_manual()}</SelectItem>
+                    <SelectItem value="scene">{m.player_settings_lyrics_color_mode_scene()}</SelectItem>
+                    <SelectItem value="dark">{m.player_settings_lyrics_color_mode_dark()}</SelectItem>
+                    <SelectItem value="light">{m.player_settings_lyrics_color_mode_light()}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                <SettingColor
+                  disabled={lyricsSettings.karaokeMode !== "manual"}
+                  label={m.player_settings_lyrics_karaoke_from_color()}
+                  onChange={(value) =>
+                    setLyricsSettings({
+                      karaokeMode: "manual",
+                      karaokeFrom: value,
+                    })
+                  }
+                  value={lyricsSettings.karaokeFrom}
+                />
+                <SettingColor
+                  disabled={lyricsSettings.karaokeMode !== "manual"}
+                  label={m.player_settings_lyrics_karaoke_to_color()}
+                  onChange={(value) =>
+                    setLyricsSettings({
+                      karaokeMode: "manual",
+                      karaokeTo: value,
+                    })
+                  }
+                  value={lyricsSettings.karaokeTo}
+                />
+              </div>
+            </div>
+          )}
+          <SettingSwitch
+            checked={lyricsSettings.shadow}
+            description={m.player_settings_lyrics_shadow_description()}
+            label={m.player_settings_lyrics_shadow()}
+            onCheckedChange={(checked) =>
+              setLyricsSettings({ shadow: checked })
+            }
+          />
+          <SettingSlider
+            formatValue={(value) => `${value.toFixed(1)}rem`}
+            label={m.player_settings_lyrics_position()}
+            max={20}
+            min={0}
+            onChange={(value) => setLyricsSettings({ bottomOffset: value })}
+            step={0.5}
+            value={lyricsSettings.bottomOffset}
+          />
+          <div className="space-y-2">
+            <Label>{m.player_settings_lyrics_alignment()}</Label>
+            <Select
+              onValueChange={(nextValue) => {
+                if (
+                  nextValue === "left" ||
+                  nextValue === "center" ||
+                  nextValue === "right"
+                ) {
+                  setLyricsSettings({ align: nextValue });
+                }
+              }}
+              value={lyricsSettings.align}
+            >
+              <SelectTrigger aria-label={m.player_settings_lyrics_alignment()}>
+                <SelectValue>
+                  {lyricsSettings.align === "left"
+                    ? m.player_settings_align_left()
+                    : lyricsSettings.align === "right"
+                      ? m.player_settings_align_right()
+                      : m.player_settings_align_center()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">{m.player_settings_align_left()}</SelectItem>
+                <SelectItem value="center">{m.player_settings_align_center()}</SelectItem>
+                <SelectItem value="right">{m.player_settings_align_right()}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+
         <section className="space-y-4 rounded-2xl border border-border/70 bg-card/40 p-4">
           <SettingHeading title={m.player_settings_lighting()} />
           <SettingSlider

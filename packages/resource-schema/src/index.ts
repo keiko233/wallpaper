@@ -397,14 +397,16 @@ const SELECTABLE_ENTRYPOINT_KINDS: ReadonlySet<string> = new Set([
 
 /**
  * Entrypoint keys each resource kind may declare. A stage may additionally
- * declare a "skybox" entrypoint when its artifact bundles a skybox model.
+ * declare a "skybox" entrypoint when its artifact bundles a skybox model. An
+ * audio resource may additionally declare a "lyrics" entrypoint (an LRC
+ * document) when its artifact bundles synced lyrics for the track.
  */
 const ENTRYPOINT_KEYS_BY_KIND: Readonly<Record<ResourceKind, readonly string[]>> = {
   model: ["model"],
   motion: ["motions"],
   stage: ["stage", "skybox"],
   skybox: ["skybox"],
-  audio: ["audio"],
+  audio: ["audio", "lyrics"],
   camera: ["camera"],
   video: [],
 };
@@ -710,6 +712,7 @@ export const WallpaperEngineBundleSchema = z
               motionPath: z.array(bundledPublicPathSchema).min(1),
               audioPath: bundledPublicPathSchema,
               cameraPath: bundledPublicPathSchema.optional(),
+              lyricsPath: bundledPublicPathSchema.optional(),
             })
             .strict(),
         ),

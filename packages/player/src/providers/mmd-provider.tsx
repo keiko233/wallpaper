@@ -16,6 +16,7 @@ import {
   MmdActionsContext,
   MmdCanvasContext,
   MmdPerformanceContext,
+  MmdPlaybackContext,
   MmdStateContext,
   type MmdActions,
   type MmdState,
@@ -23,6 +24,11 @@ import {
 } from "./mmd-context";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
+  DEFAULT_LYRICS_SETTINGS,
+  type LyricsAlignment,
+  type LyricsColorMode,
+  type LyricsFontFamily,
+  type LyricsSettings,
   type MmdMaterialRenderMode,
   type MmdPhysicsBackend,
   type MmdPlaylistItem,
@@ -45,6 +51,7 @@ import {
   DEFAULT_STAGES,
 } from "../defaults";
 import { MmdController } from "../lib/babylon/MmdController";
+import { LyricsOverlay } from "../components/lyrics-overlay";
 import { PerformanceOverlay } from "../components/performance-overlay";
 import { OVERLAY_VISIBLE_STORAGE_KEY } from "../lib/overlay-storage";
 import { useLocalStorage } from "react-use";
@@ -153,6 +160,105 @@ function normalizePhysicsBackend(value: unknown): MmdPhysicsBackend {
 
 function normalizePhysicsStepRate(value: unknown): number {
   return value === 30 || value === 120 ? value : 60;
+}
+
+function normalizeLyricsAlignment(value: unknown): LyricsAlignment {
+  return value === "left" || value === "right"
+    ? value
+    : DEFAULT_LYRICS_SETTINGS.align;
+}
+
+function normalizeLyricsFontFamily(value: unknown): LyricsFontFamily {
+  return value === "sans" || value === "serif" || value === "monospace"
+    ? value
+    : DEFAULT_LYRICS_SETTINGS.fontFamily;
+}
+
+function normalizeLyricsColorMode(
+  value: unknown,
+  legacyColorFromBackground: unknown,
+): LyricsColorMode {
+  if (value === "scene" || value === "dark" || value === "light") {
+    return value;
+  }
+  if (value === "manual") return "manual";
+  // Legacy "colorFromBackground" boolean maps to scene sampling.
+  return legacyColorFromBackground === true
+    ? "scene"
+    : DEFAULT_LYRICS_SETTINGS.colorMode;
+}
+
+function normalizeLyricsSettings(value: unknown): LyricsSettings {
+  const candidate =
+    typeof value === "object" && value !== null
+      ? (value as Partial<LyricsSettings> & {
+          colorFromBackground?: unknown;
+          bottomPercent?: unknown;
+        })
+      : {};
+  return {
+    fontSize: normalizeNumber(
+      candidate.fontSize,
+      DEFAULT_LYRICS_SETTINGS.fontSize,
+      0.6,
+      2,
+    ),
+    fontWeight: normalizeNumber(
+      candidate.fontWeight,
+      DEFAULT_LYRICS_SETTINGS.fontWeight,
+      100,
+      900,
+    ),
+    fontFamily: normalizeLyricsFontFamily(candidate.fontFamily),
+    letterSpacing: normalizeNumber(
+      candidate.letterSpacing,
+      DEFAULT_LYRICS_SETTINGS.letterSpacing,
+      -2,
+      8,
+    ),
+    colorMode: normalizeLyricsColorMode(
+      candidate.colorMode,
+      candidate.colorFromBackground,
+    ),
+    fontColor: normalizeRgbHexColor(
+      candidate.fontColor ?? DEFAULT_LYRICS_SETTINGS.fontColor,
+      DEFAULT_LYRICS_SETTINGS.fontColor,
+    ),
+    karaokeMode: normalizeLyricsColorMode(
+      candidate.karaokeMode,
+      undefined,
+    ),
+    karaokeFrom: normalizeRgbHexColor(
+      candidate.karaokeFrom ?? DEFAULT_LYRICS_SETTINGS.karaokeFrom,
+      DEFAULT_LYRICS_SETTINGS.karaokeFrom,
+    ),
+    karaokeTo: normalizeRgbHexColor(
+      candidate.karaokeTo ?? DEFAULT_LYRICS_SETTINGS.karaokeTo,
+      DEFAULT_LYRICS_SETTINGS.karaokeTo,
+    ),
+    opacity: normalizeNumber(
+      candidate.opacity,
+      DEFAULT_LYRICS_SETTINGS.opacity,
+      0.1,
+      1,
+    ),
+    karaoke: normalizeBoolean(
+      candidate.karaoke,
+      DEFAULT_LYRICS_SETTINGS.karaoke,
+    ),
+    shadow: normalizeBoolean(
+      candidate.shadow,
+      DEFAULT_LYRICS_SETTINGS.shadow,
+    ),
+    // Legacy "bottomPercent" (vh) is compatible in scale with the new rem offset.
+    bottomOffset: normalizeNumber(
+      candidate.bottomOffset ?? candidate.bottomPercent,
+      DEFAULT_LYRICS_SETTINGS.bottomOffset,
+      0,
+      20,
+    ),
+    align: normalizeLyricsAlignment(candidate.align),
+  };
 }
 
 function normalizeTextureAnisotropy(
@@ -560,6 +666,9 @@ export function MmdProvider({
   const [playbackRate, setPlaybackRateState] = useState(() =>
     clamp(initialPlaybackRate, 0.07, 16),
   );
+  const [lyricsVisible, setLyricsVisibleState] = useState(true);
+  const [lyricsSettings, setStoredLyricsSettings] =
+    useState<LyricsSettings>(() => ({ ...DEFAULT_LYRICS_SETTINGS }));
   const [renderSettings, setStoredRenderSettings] =
     useState<MmdRenderSettings>(() => ({
       ...DEFAULT_MMD_RENDER_SETTINGS,
@@ -615,6 +724,14 @@ export function MmdProvider({
             normalizeNumber(state.playbackRate, initialPlaybackRate, 0.07, 16),
           );
         }
+        if (state.lyricsVisible !== undefined) {
+          setLyricsVisibleState(state.lyricsVisible === true);
+        }
+        if (state.lyricsSettings !== undefined) {
+          setStoredLyricsSettings(
+            normalizeLyricsSettings(state.lyricsSettings),
+          );
+        }
         if (state.renderSettings !== undefined) {
           setStoredRenderSettings(
             normalizeRenderSettings(state.renderSettings),
@@ -659,6 +776,8 @@ export function MmdProvider({
           background,
           volume,
           playbackRate,
+          lyricsVisible,
+          lyricsSettings,
           renderSettings,
         })
         .catch((persistenceError: unknown) => {
@@ -678,6 +797,8 @@ export function MmdProvider({
     background,
     volume,
     playbackRate,
+    lyricsVisible,
+    lyricsSettings,
     renderSettings,
   ]);
 
@@ -1170,6 +1291,19 @@ export function MmdProvider({
     },
     [controllers, markPersistenceDirty],
   );
+  const setLyricsVisible = useCallback((visible: boolean): void => {
+    markPersistenceDirty();
+    setLyricsVisibleState(visible);
+  }, [markPersistenceDirty]);
+  const setLyricsSettings = useCallback(
+    (settings: Partial<LyricsSettings>): void => {
+      markPersistenceDirty();
+      setStoredLyricsSettings((current) =>
+        normalizeLyricsSettings({ ...current, ...settings }),
+      );
+    },
+    [markPersistenceDirty],
+  );
   const setRenderSettings = useCallback(
     (settings: Partial<MmdRenderSettings>): void => {
       const current = renderSettingsRef.current;
@@ -1226,6 +1360,8 @@ export function MmdProvider({
       isPlaying,
       volume,
       playbackRate,
+      lyricsVisible,
+      lyricsSettings,
       renderSettings,
     }),
     [
@@ -1250,6 +1386,8 @@ export function MmdProvider({
       isPlaying,
       volume,
       playbackRate,
+      lyricsVisible,
+      lyricsSettings,
       renderSettings,
     ],
   );
@@ -1280,6 +1418,8 @@ export function MmdProvider({
       seek,
       setVolume,
       setPlaybackRate,
+      setLyricsVisible,
+      setLyricsSettings,
       setRenderSettings,
       resetRenderSettings,
     }),
@@ -1309,6 +1449,8 @@ export function MmdProvider({
       seek,
       setVolume,
       setPlaybackRate,
+      setLyricsVisible,
+      setLyricsSettings,
       setRenderSettings,
       resetRenderSettings,
     ],
@@ -1327,13 +1469,23 @@ export function MmdProvider({
     }),
     [activeSlot, controllers, statsRevision, overlayVisible, setOverlayVisible],
   );
+  const playbackState = useMemo(
+    () => ({
+      getCurrentTime: (slot: number) => controllers[slot].getCurrentTime(),
+      getFrameColorSample: (slot: number) =>
+        controllers[slot].getFrameColorSample(),
+    }),
+    [controllers],
+  );
 
   return (
     <MmdCanvasContext value={canvasState}>
       <MmdStateContext value={state}>
         <MmdActionsContext value={actions}>
           <MmdPerformanceContext value={performanceState}>
-            {children}
+            <MmdPlaybackContext value={playbackState}>
+              {children}
+            </MmdPlaybackContext>
           </MmdPerformanceContext>
         </MmdActionsContext>
       </MmdStateContext>
@@ -1383,6 +1535,7 @@ export function MmdCanvas({
         ref={setSecondCanvas}
       />
       <PerformanceOverlay />
+      <LyricsOverlay />
       <AnimatePresence>
         {isTransitioning && (
           <Motion.div

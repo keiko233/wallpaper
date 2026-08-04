@@ -7,10 +7,12 @@ import {
 } from "react";
 import type { PerformanceSnapshot, PerformanceStats } from "../lib/performance-stats";
 import type {
+  LyricsSettings,
   MmdPlaylistItem,
   MmdRenderSettings,
   ModelList,
   MotionList,
+  SceneColorSample,
   SkyboxList,
   StageList,
 } from "../types";
@@ -39,6 +41,9 @@ export interface MmdState {
   isPlaying: boolean;
   volume: number;
   playbackRate: number;
+  /** Whether time-synced lyrics are shown over the wallpaper. */
+  lyricsVisible: boolean;
+  lyricsSettings: LyricsSettings;
   renderSettings: MmdRenderSettings;
 }
 
@@ -68,6 +73,8 @@ export interface MmdActions {
   seek: (seconds: number) => Promise<void>;
   setVolume: (volume: number) => void;
   setPlaybackRate: (rate: number) => void;
+  setLyricsVisible: (visible: boolean) => void;
+  setLyricsSettings: (settings: Partial<LyricsSettings>) => void;
   setRenderSettings: (settings: Partial<MmdRenderSettings>) => void;
   resetRenderSettings: () => void;
 }
@@ -96,13 +103,34 @@ export interface MmdPerformanceState {
   getStats: (slot: number) => PerformanceStats | null;
 }
 
+/**
+ * Playback clock of the active controller. Exposes the audio time and the
+ * sampled frame color so time-synced UI (e.g. lyrics) can track playback
+ * without re-rendering on every animation frame.
+ */
+export interface MmdPlaybackState {
+  /** Seconds of audio already played by the slot's controller. */
+  getCurrentTime: (slot: number) => number;
+  /** Last sampled average color of the frame behind the lyrics. */
+  getFrameColorSample: (slot: number) => SceneColorSample | null;
+}
+
 export const MmdPerformanceContext =
   createContext<MmdPerformanceState | null>(null);
+export const MmdPlaybackContext = createContext<MmdPlaybackState | null>(null);
 
 export function useMmdPerformance(): MmdPerformanceState {
   const context = useContext(MmdPerformanceContext);
   if (context === null) {
     throw new Error("useMmdPerformance must be used within MmdProvider.");
+  }
+  return context;
+}
+
+export function useMmdPlayback(): MmdPlaybackState {
+  const context = useContext(MmdPlaybackContext);
+  if (context === null) {
+    throw new Error("useMmdPlayback must be used within MmdProvider.");
   }
   return context;
 }

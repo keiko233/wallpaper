@@ -15,6 +15,7 @@ import { Button } from "@wallpaper/ui/button";
 import { SheetTrigger } from "@wallpaper/ui/sheet";
 import { cn } from "@wallpaper/ui/utils";
 import { useMmdActions, useMmdState } from "../providers/mmd-context";
+import { setControlBarState } from "../lib/control-bar-visibility";
 
 const FADE_AFTER_MS = 2200;
 const INITIAL_VISIBLE_MS = 4000;
@@ -97,6 +98,12 @@ export function PlaybackControls() {
 
     return clearFadeTimer;
   }, [clearFadeTimer, expanded, scheduleFade]);
+
+  useEffect(() => {
+    setControlBarState(
+      !visible ? "hidden" : expanded ? "expanded" : "pill",
+    );
+  }, [visible, expanded]);
 
   const isLoading = status === "loading";
   const canControlPlayback = status === "ready" || isPlaying;

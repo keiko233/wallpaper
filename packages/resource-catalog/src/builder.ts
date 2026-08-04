@@ -221,6 +221,8 @@ export function contentType(path: string): string {
       return "image/jpeg";
     case ".json":
       return "application/json; charset=utf-8";
+    case ".lrc":
+      return "text/plain; charset=utf-8";
     case ".mp3":
       return "audio/mpeg";
     case ".mp4":
@@ -931,6 +933,12 @@ export async function buildWallpaperEngineBundle(
               `Motion ${definition.id}@${definition.version} depends on ${dependency.id}@${dependency.version}, which is not compatible with wallpaper-engine.`,
             );
           }
+          if (
+            entrypointKeys.length === 1 &&
+            target.artifact.entrypoints[entrypointKeys[0]!] === undefined
+          ) {
+            return undefined;
+          }
           return bundledPath(
             target,
             configuredEntrypoints(target, entrypointKeys)[0]!,
@@ -945,6 +953,10 @@ export async function buildWallpaperEngineBundle(
           cameraDependency === undefined
             ? undefined
             : resolveDependencyPath(cameraDependency, ["camera"]);
+        const lyricsPath =
+          audioDependency === undefined
+            ? undefined
+            : resolveDependencyPath(audioDependency, ["lyrics"]);
 
         if (audioPath === undefined) {
           throw new Error(
@@ -957,6 +969,7 @@ export async function buildWallpaperEngineBundle(
           motionPath,
           audioPath,
           cameraPath,
+          ...(lyricsPath === undefined ? {} : { lyricsPath }),
         });
         break;
       }

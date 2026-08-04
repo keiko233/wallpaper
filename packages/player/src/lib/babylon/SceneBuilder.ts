@@ -71,6 +71,7 @@ import {
   type MmdMaterialRenderMode,
   type MmdPhysicsBackend,
   type MmdRenderSettings,
+  type SceneColorSample,
   type StageRenderProfile,
 } from "../../types";
 import { resolvePlayerResourceUrl } from "../resource-url";
@@ -159,6 +160,13 @@ export class SceneBuilder implements ISceneBuilder {
   private readonly backgroundColor: Color4;
   private readonly onEnded?: () => void;
   private renderSettings: MmdRenderSettings;
+  private lastFrameSampleTime = 0;
+  private frameColorSample: SceneColorSample = {
+    luminance: 0.5,
+    r: 255,
+    g: 255,
+    b: 255,
+  };
 
   constructor({
     modelPath,
@@ -206,6 +214,69 @@ export class SceneBuilder implements ISceneBuilder {
     return this.audioPlayer;
   }
 
+  /** Last sampled average color of the frame region behind the lyrics. */
+  public getFrameColorSample(): SceneColorSample {
+    return this.frameColorSample;
+  }
+
+  /**
+   * Reads the bottom-center region of the rendered frame (where the lyrics
+   * sit) and averages its RGB. Returns null when the readback yields nothing
+   * usable (e.g. a blank/unflushed drawing buffer).
+   */
+  private async sampleFrameColor(): Promise<SceneColorSample | null> {
+    const width = this.engine.getRenderWidth();
+    const height = this.engine.getRenderHeight();
+    if (width <= 0 || height <= 0) return null;
+
+    const regionWidth = Math.min(160, width);
+    const regionHeight = Math.min(64, height);
+    const x = Math.floor((width - regionWidth) / 2);
+    const y = Math.min(116, Math.max(0, height - regionHeight));
+
+    let pixels: ArrayBufferView | null = null;
+    try {
+      pixels = await this.engine.readPixels(
+        x,
+        y,
+        regionWidth,
+        regionHeight,
+        true,
+        false,
+      );
+    } catch {
+      return null;
+    }
+    if (pixels === null || pixels.byteLength < 4) return null;
+
+    const bytes = new Uint8Array(
+      pixels.buffer,
+      pixels.byteOffset,
+      pixels.byteLength,
+    );
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let count = 0;
+    for (let i = 0; i + 2 < bytes.length; i += 4) {
+      r += bytes[i]!;
+      g += bytes[i + 1]!;
+      b += bytes[i + 2]!;
+      count++;
+    }
+    if (count === 0 || r + g + b < 3) return null;
+
+    r /= count;
+    g /= count;
+    b /= count;
+    return {
+      luminance: (0.299 * r + 0.587 * g + 0.114 * b) / 255,
+      r,
+      g,
+      b,
+    };
+  }
+
   public setBackgroundColor(color: Color4): void {
     color.toLinearSpaceToRef(this.scene.clearColor);
   }
@@ -244,6 +315,18 @@ export class SceneBuilder implements ISceneBuilder {
 
     this.mmdRoot = new TransformNode("mmdRoot", this.scene);
     this.mmdRoot.position.z = 20;
+
+    // Sample the frame region behind the lyrics once per second so the
+    // lyrics overlay can derive contrast and theme colors from the actual
+    // rendered scene instead of the flat clear color.
+    this.scene.onAfterRenderObservable.add(() => {
+      const now = performance.now();
+      if (now - this.lastFrameSampleTime < 1_000) return;
+      this.lastFrameSampleTime = now;
+      void this.sampleFrameColor().then((sample) => {
+        if (sample !== null) this.frameColorSample = sample;
+      });
+    });
   }
 
   private setupCameras(): void {

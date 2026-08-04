@@ -16,6 +16,8 @@ const PLAYER_SETTING_KEYS = [
   "background",
   "volume",
   "playbackRate",
+  "lyricsVisible",
+  "lyricsSettings",
   "renderSettings",
 ] as const;
 
@@ -98,6 +100,17 @@ export class DexiePlayerPersistence implements PlayerPersistence {
             state.playbackRate = setting.value;
           }
           break;
+        case "lyricsVisible":
+          if (typeof setting.value === "boolean") {
+            state.lyricsVisible = setting.value;
+          }
+          break;
+        case "lyricsSettings":
+          if (typeof setting.value === "object" && setting.value !== null) {
+            state.lyricsSettings =
+              setting.value as PersistedPlayerState["lyricsSettings"];
+          }
+          break;
         case "renderSettings":
           if (typeof setting.value === "object" && setting.value !== null) {
             state.renderSettings =
@@ -155,6 +168,8 @@ export class DexiePlayerPersistence implements PlayerPersistence {
             ["background", state.background],
             ["volume", state.volume],
             ["playbackRate", state.playbackRate],
+            ["lyricsVisible", state.lyricsVisible],
+            ["lyricsSettings", state.lyricsSettings],
             ["renderSettings", state.renderSettings],
           ] as const
         ).flatMap(([key, value]) =>

@@ -5,6 +5,8 @@ export interface MotionList {
   audioPath: string;
   cameraPath?: string;
   cameraDelaySeconds?: number;
+  /** Path to a synced-lyrics document (LRC) shown over the wallpaper during playback. */
+  lyricsPath?: string;
   /** Display group (source resource) when the motion has selectable variants. */
   group?: string;
   remark?: string;
@@ -122,12 +124,100 @@ export interface MmdPlaylistItem {
   skyboxId: string;
 }
 
+export type LyricsAlignment = "left" | "center" | "right";
+
+export type LyricsFontFamily = "system" | "sans" | "serif" | "monospace";
+
+/**
+ * Where a lyrics color comes from. "scene" samples the rendered frame behind
+ * the lyrics; "dark"/"light" apply a full preset theme; "manual" uses the
+ * user-chosen color.
+ */
+export type LyricsColorMode = "manual" | "scene" | "dark" | "light";
+
+/** Dark-theme preset: readable on bright... on dark scenes. */
+export const LYRICS_DARK_THEME = {
+  fontColor: "#FFFFFF",
+  karaokeFrom: "#FFD166",
+  karaokeTo: "#FF9F43",
+  shadow: true,
+} as const;
+
+/** Light-theme preset: readable on bright scenes. */
+export const LYRICS_LIGHT_THEME = {
+  fontColor: "#1A1A1A",
+  karaokeFrom: "#D97706",
+  karaokeTo: "#B45309",
+  shadow: true,
+} as const;
+
+/** Average color of the frame region sampled for lyric contrast/theming. */
+export interface SceneColorSample {
+  /** Relative luminance of the sampled region (0-1). */
+  luminance: number;
+  /** Average RGB channels (0-255). */
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface LyricsSettings {
+  /** Font size scale relative to the base size (0.6-2). */
+  fontSize: number;
+  /** Font weight (100-900). */
+  fontWeight: number;
+  /** Font family preset. */
+  fontFamily: LyricsFontFamily;
+  /** Letter spacing in px (-2-8). */
+  letterSpacing: number;
+  /** Where the text color comes from. */
+  colorMode: LyricsColorMode;
+  /** Manual text color (#RRGGBB). Used only when colorMode is "manual". */
+  fontColor: string;
+  /** Where the karaoke highlight colors come from. */
+  karaokeMode: LyricsColorMode;
+  /** Karaoke gradient start color (#RRGGBB). Used only when karaokeMode is "manual". */
+  karaokeFrom: string;
+  /** Karaoke gradient end color (#RRGGBB). Used only when karaokeMode is "manual". */
+  karaokeTo: string;
+  /** Text opacity (0.1-1). */
+  opacity: number;
+  /** Animated karaoke fill over the active line. */
+  karaoke: boolean;
+  /** Soft drop shadow behind the text. */
+  shadow: boolean;
+  /** Extra distance above the control bar in rem (0-20). */
+  bottomOffset: number;
+  /** Horizontal alignment. */
+  align: LyricsAlignment;
+}
+
+export const DEFAULT_LYRICS_SETTINGS: LyricsSettings = {
+  fontSize: 1,
+  fontWeight: 700,
+  fontFamily: "system",
+  letterSpacing: 0,
+  colorMode: "scene",
+  fontColor: "#FFFFFF",
+  karaokeMode: "scene",
+  karaokeFrom: "#FFD166",
+  karaokeTo: "#FF9F43",
+  opacity: 1,
+  karaoke: true,
+  shadow: true,
+  bottomOffset: 0,
+  align: "center",
+};
+
 export interface PersistedPlayerState {
   playlist?: readonly MmdPlaylistItem[];
   playlistIndex?: number;
   background?: string;
   volume?: number;
   playbackRate?: number;
+  /** Whether time-synced lyrics are shown over the wallpaper. */
+  lyricsVisible?: boolean;
+  lyricsSettings?: LyricsSettings;
   renderSettings?: MmdRenderSettings;
 }
 

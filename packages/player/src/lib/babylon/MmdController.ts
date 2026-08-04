@@ -5,6 +5,7 @@ import { SceneBuilder } from "./SceneBuilder";
 import { PerformanceStats } from "../performance-stats";
 import type {
   MmdRenderSettings,
+  SceneColorSample,
   StageRenderProfile,
 } from "../../types";
 
@@ -149,6 +150,17 @@ export class MmdController {
     if (audioPlayer !== undefined) {
       audioPlayer.volume = Math.min(1, Math.max(0, volume));
     }
+  }
+
+  /** Current audio playback time in seconds, 0 when no scene is loaded. */
+  public getCurrentTime(): number {
+    const audioPlayer = this.sceneBuilder?.getAudioPlayer();
+    return audioPlayer?.currentTime ?? 0;
+  }
+
+  /** Last sampled average color of the frame behind the lyrics, if loaded. */
+  public getFrameColorSample(): SceneColorSample | null {
+    return this.sceneBuilder?.getFrameColorSample() ?? null;
   }
 
   public setPlaybackRate(rate: number): void {

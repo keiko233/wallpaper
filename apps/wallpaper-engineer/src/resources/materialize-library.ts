@@ -341,6 +341,7 @@ export async function materializeLibrary(
         );
 
         let audioPath: string | undefined;
+        let lyricsPath: string | undefined;
         let cameraFiles: VersionFiles | undefined;
         let cameraOptions: ResolvedArtifactEntrypoint[] | undefined;
 
@@ -359,6 +360,13 @@ export async function materializeLibrary(
               ["audio"],
               [".mp3", ".ogg", ".wav", ".m4a", ".aac", ".flac"],
             );
+            if (dependencyFiles.entrypoints["lyrics"] !== undefined) {
+              lyricsPath = resolveVirtualUrl(
+                dependencyFiles,
+                ["lyrics"],
+                [".lrc"],
+              );
+            }
           } else if (dependency.binding === "camera") {
             cameraFiles = dependencyFiles;
             cameraOptions = resolveVariantEntrypoints(
@@ -412,6 +420,7 @@ export async function materializeLibrary(
                   : cameraFiles?.virtualUrls.get(
                       cameraOption.paths[0]!,
                     ),
+              ...(lyricsPath === undefined ? {} : { lyricsPath }),
               ...(hasVariants ? { group: resource.name } : {}),
               remark:
                 motionOption.remark ??
