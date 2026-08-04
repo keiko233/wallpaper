@@ -42,7 +42,6 @@ import { DefaultRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPi
 import { DepthOfFieldEffectBlurLevel } from "@babylonjs/core/PostProcesses/depthOfFieldEffect";
 import { ColorCurves } from "@babylonjs/core/Materials/colorCurves";
 import { ImageProcessingConfiguration } from "@babylonjs/core/Materials/imageProcessingConfiguration";
-import { GlowLayer } from "@babylonjs/core/Layers/glowLayer";
 import { MirrorTexture } from "@babylonjs/core/Materials/Textures/mirrorTexture";
 import { SSAORenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssaoRenderingPipeline";
 import { SSRRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline";
@@ -1268,17 +1267,13 @@ export class SceneBuilder implements ISceneBuilder {
     groups: NonNullable<StageRenderProfile["emissive"]>,
     stageMesh: MmdMesh,
   ): void {
-    const glowLayer = new GlowLayer("stageRenderGlow", this.scene, {
-      mainTextureSamples: 2,
-    });
-    // An empty inclusion list means "all meshes" by default. Profiles use
-    // explicit material names, so exclude everything unless it matches.
-    glowLayer.setExcludedByDefault(true);
-
     for (const group of groups) {
       // StandardMaterial has no emissive intensity in 9.17; scale the color
-      // instead. The MMD shader clamps the added emissive so the visible
-      // surface cannot blow out to pure white.
+      // instead. The default rendering pipeline derives bloom from the final
+      // visible emissive pixels, so scene depth naturally prevents a bright
+      // stage surface behind the character from glowing through it. A
+      // separate GlowLayer render target cannot reliably use MMD alpha-blend
+      // materials as depth occluders and causes the light-leak seen here.
       const color = Color3.FromHexString(group.color).scale(group.intensity);
       for (const mesh of this.findStageMeshes(
         stageMesh,
@@ -1293,7 +1288,6 @@ export class SceneBuilder implements ISceneBuilder {
         if (baseTexture !== null) {
           clone.emissiveTexture = baseTexture;
         }
-        glowLayer.addIncludedOnlyMesh(mesh);
       }
     }
   }
