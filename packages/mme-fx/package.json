@@ -1,0 +1,14 @@
+{
+  "name": "@wallpaper/mme-fx",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "wallpaper-mme-fx": "./bin/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

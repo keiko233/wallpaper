@@ -25,6 +25,15 @@ export interface ModelList {
  * player's dependency ownership.
  */
 export interface StageRenderProfile {
+  effects?: {
+    kind: "mme";
+    sourcePath: string;
+    accessoryPath?: string;
+    parameters: Record<string, number>;
+    textureSize: number;
+    fitToStage: boolean;
+    planeOffset: number;
+  }[];
   materials?: {
     materialNames: string[];
     kind: "pbr";

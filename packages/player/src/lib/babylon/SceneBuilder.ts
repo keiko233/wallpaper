@@ -48,6 +48,8 @@ import { SSAORenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipel
 import { SSRRenderingPipeline } from "@babylonjs/core/PostProcesses/RenderPipeline/Pipelines/ssrRenderingPipeline";
 import { Plane } from "@babylonjs/core/Maths/math.plane";
 import type { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { MmdEffectHost } from "./MmdEffectHost";
+import { MmdModelEffectHost } from "./MmdModelEffectHost";
 import {
   DEFAULT_MMD_RENDER_SETTINGS,
   type MmdMaterialRenderMode,
@@ -126,6 +128,7 @@ export class SceneBuilder implements ISceneBuilder {
   private stageRenderProfile: StageRenderProfile | null;
   private stageCloneIndex = 0;
   private stagePointLights: PointLight[] = [];
+  private mmdEffectHost?: MmdEffectHost;
   /** The backend that was actually enabled (ammo may fall back to havok). */
   private actualPhysicsBackend: MmdPhysicsBackend | null = null;
 
@@ -631,8 +634,16 @@ export class SceneBuilder implements ISceneBuilder {
       this.stageRenderProfile !== null &&
       this.renderSettings.stageEffectsEnabled
     ) {
-      this.applyStageRenderProfile(stageMesh, modelMesh, skyboxMesh);
+      await this.applyStageRenderProfile(stageMesh, modelMesh, skyboxMesh);
     }
+
+    await new MmdModelEffectHost({
+      scene: this.scene,
+      modelMesh,
+      effectMapUrl: this.resolveModelEffectMapUrl(),
+      resolveModelUrl: (relativePath) =>
+        this.resolveModelEffectUrl(relativePath),
+    }).applyConventionalEmd();
 
     const physicsStrength = this.renderSettings.physicsStrength;
     if (physicsStrength !== 1) {
@@ -1081,11 +1092,11 @@ export class SceneBuilder implements ISceneBuilder {
     }
   }
 
-  private applyStageRenderProfile(
+  private async applyStageRenderProfile(
     stageMesh: MmdMesh,
     modelMesh: MmdMesh,
     skyboxMesh: MmdMesh | null,
-  ): void {
+  ): Promise<void> {
     const profile = this.stageRenderProfile;
     if (profile === null) return;
 
@@ -1113,6 +1124,18 @@ export class SceneBuilder implements ISceneBuilder {
     }
     if (profile.emissive !== undefined) {
       this.applyStageEmissive(profile.emissive, stageMesh);
+    }
+    if (profile.effects !== undefined) {
+      this.mmdEffectHost = new MmdEffectHost({
+        scene: this.scene,
+        root: this.mmdRoot,
+        stageMesh,
+        modelMesh,
+        skyboxMesh,
+        resolveStageUrl: (relativePath) =>
+          this.resolveStageProfileUrl(relativePath),
+      });
+      await this.mmdEffectHost.apply(profile.effects);
     }
   }
 
@@ -1333,6 +1356,19 @@ export class SceneBuilder implements ISceneBuilder {
     const stageUrl = new URL(this.stagePath ?? "", "https://wallpaper.invalid");
     return resolvePlayerResourceUrl(
       new URL(relativePath, stageUrl).pathname,
+    );
+  }
+
+  private resolveModelEffectMapUrl(): string {
+    const modelUrl = new URL(this.modelPath, "https://wallpaper.invalid");
+    const emdPath = modelUrl.pathname.replace(/\.[^./]+$/u, ".emd");
+    return resolvePlayerResourceUrl(emdPath);
+  }
+
+  private resolveModelEffectUrl(relativePath: string): string {
+    const modelUrl = new URL(this.modelPath, "https://wallpaper.invalid");
+    return resolvePlayerResourceUrl(
+      new URL(relativePath, modelUrl).pathname,
     );
   }
 

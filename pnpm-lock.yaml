@@ -153,6 +153,8 @@ importers:
         specifier: ^8.1.1
         version: 8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)
 
+  packages/mme-fx: {}
+
   packages/player:
     dependencies:
       '@babylonjs/core':
@@ -170,6 +172,9 @@ importers:
       '@wallpaper/ammo-wasm':
         specifier: workspace:*
         version: link:../ammo-wasm
+      '@wallpaper/mme-fx':
+        specifier: workspace:*
+        version: link:../mme-fx
       '@wallpaper/ui':
         specifier: workspace:*
         version: link:../ui

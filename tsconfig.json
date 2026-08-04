@@ -5,6 +5,7 @@
     { "path": "./packages/resource-catalog" },
     { "path": "./packages/ui" },
     { "path": "./packages/ammo-wasm" },
+    { "path": "./packages/mme-fx" },
     { "path": "./packages/player" },
     { "path": "./apps/web/tsconfig.app.json" },
     { "path": "./apps/web/tsconfig.node.json" },

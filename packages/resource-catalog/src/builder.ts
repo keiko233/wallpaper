@@ -325,6 +325,33 @@ export function validateEntrypoints(
   }
 }
 
+function renderEffectPaths(definition: ResourceDefinition): string[] {
+  if (definition.kind !== "stage") {
+    return [];
+  }
+  return (definition.render?.effects ?? []).flatMap((effect) => [
+    effect.sourcePath,
+    ...(effect.accessoryPath === undefined ? [] : [effect.accessoryPath]),
+  ]);
+}
+
+function validateRenderEffectPaths(
+  definition: ResourceDefinition,
+  root: string,
+  files: string[],
+): void {
+  const available = new Set(
+    files.map((file) => normalizeRelativePath(root, file)),
+  );
+  for (const effectPath of renderEffectPaths(definition)) {
+    if (!available.has(effectPath)) {
+      throw new Error(
+        `Stage MME effect file does not exist for ${definition.id}: ${effectPath}`,
+      );
+    }
+  }
+}
+
 export function validateArtifactFiles(
   definition: ResourceDefinition,
   root: string,
@@ -338,6 +365,7 @@ export function validateArtifactFiles(
   const referencedPaths = [
     ...(definition.artifact.sources ?? []),
     ...entrypointPaths(definition),
+    ...renderEffectPaths(definition),
   ];
   if (
     referencedPaths.some((path) =>
@@ -361,6 +389,7 @@ export function validateArtifactFiles(
     throw new Error(`BPMX is not supported: ${definition.id}`);
   }
   validateEntrypoints(definition, root, files);
+  validateRenderEffectPaths(definition, root, files);
   if (definition.artifact.format === "raw" && files.length !== 1) {
     throw new Error(
       `Raw artifact must contain exactly one file: ${definition.id}`,

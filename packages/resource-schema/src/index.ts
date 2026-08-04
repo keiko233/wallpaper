@@ -161,6 +161,26 @@ const stageMaterialPbrSchema = z
   })
   .strict();
 
+const stageMmeEffectSchema = z
+  .object({
+    kind: z.literal("mme"),
+    sourcePath: RelativePathSchema,
+    accessoryPath: RelativePathSchema.optional(),
+    parameters: z
+      .record(
+        z.string().trim().min(1).max(64),
+        z.number().finite(),
+      )
+      .refine((value) => Object.keys(value).length <= 32, {
+        message: "MME effects support at most 32 parameter overrides.",
+      })
+      .default({}),
+    textureSize: z.number().int().min(128).max(2_048).default(1_024),
+    fitToStage: z.boolean().default(true),
+    planeOffset: z.number().min(-5).max(5).default(0.05),
+  })
+  .strict();
+
 /**
  * Optional native render profile carried by stage resources. The player uses
  * it to approximate a stage author's intended look (reflective floors,
@@ -168,6 +188,7 @@ const stageMaterialPbrSchema = z
  */
 export const StageRenderProfileSchema = z
   .object({
+    effects: z.array(stageMmeEffectSchema).min(1).max(8).optional(),
     materials: z.array(stageMaterialPbrSchema).min(1).max(32).optional(),
     reflection: z
       .object({

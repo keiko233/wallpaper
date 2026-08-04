@@ -475,6 +475,43 @@ describe("resource catalog builder", () => {
     ).toThrow(/exactly one file/u);
   });
 
+  it("validates files referenced by stage MME effects", () => {
+    const parsed = ResourceManifestSchema.parse({
+      id: "effect-stage",
+      version: "1.0.0",
+      kind: "stage",
+      name: "Effect stage",
+      render: {
+        effects: [
+          {
+            kind: "mme",
+            sourcePath: "effects/WorkingFloor2.fx",
+            accessoryPath: "effects/WorkingFloor2.x",
+          },
+        ],
+      },
+      artifact: {
+        fileName: "effect-stage.zip",
+        format: "zip",
+        entrypoints: { stage: "stage.pmx" },
+      },
+    });
+
+    expect(() =>
+      validateArtifactFiles(parsed, "/tmp/effect-stage", [
+        "/tmp/effect-stage/stage.pmx",
+        "/tmp/effect-stage/effects/WorkingFloor2.fx",
+      ])
+    ).toThrow(/WorkingFloor2\.x/u);
+    expect(() =>
+      validateArtifactFiles(parsed, "/tmp/effect-stage", [
+        "/tmp/effect-stage/stage.pmx",
+        "/tmp/effect-stage/effects/WorkingFloor2.fx",
+        "/tmp/effect-stage/effects/WorkingFloor2.x",
+      ])
+    ).not.toThrow();
+  });
+
   it("builds directly into a portable site path and removes stale bundle files", async () => {
     const loaded = await makeSite();
     const stalePath = resolve(

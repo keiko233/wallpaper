@@ -429,6 +429,14 @@ describe("resource schema", () => {
     const parsed = ResourceManifestSchema.parse({
       ...stageDefinition,
       render: {
+        effects: [
+          {
+            kind: "mme",
+            sourcePath: "effects/WorkingFloor2.fx",
+            accessoryPath: "effects/WorkingFloor2.x",
+            parameters: { Tr: 0.7 },
+          },
+        ],
         reflection: {
           materialNames: ["地板", "水纹"],
         },
@@ -446,6 +454,17 @@ describe("resource schema", () => {
     });
 
     expect(parsed.render).toEqual({
+      effects: [
+        {
+          kind: "mme",
+          sourcePath: "effects/WorkingFloor2.fx",
+          accessoryPath: "effects/WorkingFloor2.x",
+          parameters: { Tr: 0.7 },
+          textureSize: 1024,
+          fitToStage: true,
+          planeOffset: 0.05,
+        },
+      ],
       reflection: {
         materialNames: ["地板", "水纹"],
         textureSize: 512,
@@ -844,6 +863,19 @@ describe("resource schema", () => {
       ResourceManifestSchema.parse({
         ...stage,
         render: { reflection: { materialNames: [] } },
+      }),
+    ).toThrow();
+    expect(() =>
+      ResourceManifestSchema.parse({
+        ...stage,
+        render: {
+          effects: [
+            {
+              kind: "mme",
+              sourcePath: "../outside.fx",
+            },
+          ],
+        },
       }),
     ).toThrow();
   });
