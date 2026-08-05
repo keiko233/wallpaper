@@ -49,6 +49,16 @@ describe("resource catalog CLI arguments", () => {
     });
   });
 
+  it("parses publish without a prefix so collections are discovered", () => {
+    expect(
+      parseArgs(["publish-r2", "--bucket", "wallpaper-assets"]),
+    ).toMatchObject({
+      command: "publish-r2",
+      bucket: "wallpaper-assets",
+      prefix: undefined,
+    });
+  });
+
   it("rejects an option whose value is another option", () => {
     expect(() =>
       parseArgs(["publish-r2", "--bucket", "--prefix", "repo"]),

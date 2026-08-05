@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createReadStream } from "node:fs";
 import {
+  access,
   copyFile,
   mkdir,
   readFile,
@@ -604,6 +605,13 @@ export interface LoadedSite {
   manifestDir: string;
 }
 
+export interface LoadedCollection {
+  /** Collection directory name, or null when the manifest root holds resource directories directly. */
+  name: string | null;
+  /** Directory containing this collection's resource directories. */
+  directory: string;
+}
+
 export interface LoadedManifest {
   definition: ResourceDefinition;
   directory: string;
@@ -618,15 +626,66 @@ export async function loadSite(configPath: string): Promise<LoadedSite> {
   return { site, siteDir, manifestDir };
 }
 
+async function hasManifestJson(directory: string): Promise<boolean> {
+  try {
+    await access(resolve(directory, "manifest.json"));
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+export async function loadCollections(
+  loaded: LoadedSite,
+): Promise<LoadedCollection[]> {
+  const entries = await readdir(loaded.manifestDir, { withFileTypes: true });
+  const directories = entries.filter(
+    (entry) =>
+      entry.isDirectory() && !IGNORED_FILESYSTEM_ENTRIES.has(entry.name),
+  );
+  if (directories.length === 0) {
+    return [{ name: null, directory: loaded.manifestDir }];
+  }
+  let flatLayout = false;
+  for (const entry of directories) {
+    if (await hasManifestJson(resolve(loaded.manifestDir, entry.name))) {
+      flatLayout = true;
+      break;
+    }
+  }
+  if (flatLayout) {
+    return [{ name: null, directory: loaded.manifestDir }];
+  }
+  return directories.map((entry) => ({
+    name: entry.name,
+    directory: resolve(loaded.manifestDir, entry.name),
+  }));
+}
+
+function defaultCollection(
+  collections: readonly LoadedCollection[],
+): LoadedCollection | undefined {
+  return (
+    collections.find((collection) => collection.name === "defaults") ??
+    collections.find((collection) => collection.name === null) ??
+    collections[0]
+  );
+}
+
 export async function loadManifests(
   loaded: LoadedSite,
+  collection?: LoadedCollection,
 ): Promise<LoadedManifest[]> {
-  const entries = await readdir(loaded.manifestDir, { withFileTypes: true });
+  const manifestDir = collection?.directory ?? loaded.manifestDir;
+  const entries = await readdir(manifestDir, { withFileTypes: true });
   const manifests: LoadedManifest[] = [];
   for (const entry of entries) {
     if (IGNORED_FILESYSTEM_ENTRIES.has(entry.name)) continue;
     if (!entry.isDirectory()) continue;
-    const directory = resolve(loaded.manifestDir, entry.name);
+    const directory = resolve(manifestDir, entry.name);
     const manifestPath = resolve(directory, "manifest.json");
     const manifest = ResourceManifestSchema.parse(
       JSON.parse(await readFile(manifestPath, "utf8")),
@@ -661,108 +720,144 @@ export function validateDependencies(
 }
 
 export async function validateSite(loaded: LoadedSite): Promise<void> {
-  const manifests = await loadManifests(loaded);
-  const identities = new Set<string>();
-  for (const { definition, directory } of manifests) {
-    const identity = `${definition.id}@${definition.version}`;
-    if (identities.has(identity)) {
-      throw new Error(`Duplicate resource version: ${identity}`);
-    }
-    identities.add(identity);
+  const collections = await loadCollections(loaded);
+  for (const collection of collections) {
+    const manifests = await loadManifests(loaded, collection);
+    const identities = new Set<string>();
+    for (const { definition, directory } of manifests) {
+      const identity = `${definition.id}@${definition.version}`;
+      if (identities.has(identity)) {
+        throw new Error(`Duplicate resource version: ${identity}`);
+      }
+      identities.add(identity);
 
-    const { root, files } = await sourceFiles(definition, directory);
-    validateArtifactFiles(definition, root, files);
-    if (definition.cover !== null) {
-      if (pathContainsSegment(definition.cover.source, "legacy-assets")) {
-        throw new Error(
-          `legacy-assets is not supported: ${definition.cover.source}`,
-        );
-      }
-      const coverPath = resolveBelow(directory, definition.cover.source);
-      const coverStats = await stat(coverPath);
-      if (!coverStats.isFile()) {
-        throw new Error(
-          `Cover is not a file for ${definition.id}: ${coverPath}`,
-        );
+      const { root, files } = await sourceFiles(definition, directory);
+      validateArtifactFiles(definition, root, files);
+      if (definition.cover !== null) {
+        if (pathContainsSegment(definition.cover.source, "legacy-assets")) {
+          throw new Error(
+            `legacy-assets is not supported: ${definition.cover.source}`,
+          );
+        }
+        const coverPath = resolveBelow(directory, definition.cover.source);
+        const coverStats = await stat(coverPath);
+        if (!coverStats.isFile()) {
+          throw new Error(
+            `Cover is not a file for ${definition.id}: ${coverPath}`,
+          );
+        }
       }
     }
+
+    validateDependencies(manifests);
   }
+}
 
-  validateDependencies(manifests);
+export interface BuiltCollection {
+  name: string | null;
+  catalogPath: string;
+  catalogRevision: string;
+}
+
+export interface BuiltRepository {
+  catalogPath: string;
+  catalogRevision: string;
+  collections: BuiltCollection[];
 }
 
 export async function buildRepository(
   loaded: LoadedSite,
   outputDir: string,
-): Promise<{ catalogPath: string; catalogRevision: string }> {
+): Promise<BuiltRepository> {
   const outputRoot = resolveOutputRoot(loaded, outputDir);
   const temporaryRoot = resolve(outputRoot, ".tmp");
   await validateSite(loaded);
   await rm(outputRoot, { recursive: true, force: true });
-  await mkdir(outputRoot, { recursive: true });
 
-  const manifests = await loadManifests(loaded);
-  const resources: CatalogResource[] = [];
-  for (const [index, manifest] of manifests.entries()) {
-    const { definition, directory } = manifest;
-    const paths: BuildPaths = {
-      outputRoot,
-      temporaryRoot,
-      resourceDirectory: directory,
-    };
-    const [artifact, cover] = await Promise.all([
-      buildArtifact(definition, paths),
-      buildCover(definition, paths),
-    ]);
-    resources.push({
-      id: definition.id,
-      version: definition.version,
-      kind: definition.kind,
-      name: definition.name,
-      description: definition.description,
-      authors: definition.authors,
-      license: definition.license,
-      categories: definition.categories,
-      tags: definition.tags,
-      compatibility: definition.compatibility,
-      visibility: definition.visibility,
-      dependencies: definition.dependencies,
-      ...(definition.render === undefined
-        ? {}
-        : { render: definition.render }),
-      cover,
-      artifact,
-    });
-    console.log(
-      `[${index + 1}/${manifests.length}] Built ${definition.id}@${definition.version}`,
+  const collections = await loadCollections(loaded);
+  const built: BuiltCollection[] = [];
+  for (const collection of collections) {
+    const collectionOutputRoot =
+      collection.name === null
+        ? outputRoot
+        : resolve(outputRoot, collection.name);
+    await mkdir(collectionOutputRoot, { recursive: true });
+
+    const manifests = await loadManifests(loaded, collection);
+    const resources: CatalogResource[] = [];
+    for (const [index, manifest] of manifests.entries()) {
+      const { definition, directory } = manifest;
+      const paths: BuildPaths = {
+        outputRoot: collectionOutputRoot,
+        temporaryRoot,
+        resourceDirectory: directory,
+      };
+      const [artifact, cover] = await Promise.all([
+        buildArtifact(definition, paths),
+        buildCover(definition, paths),
+      ]);
+      resources.push({
+        id: definition.id,
+        version: definition.version,
+        kind: definition.kind,
+        name: definition.name,
+        description: definition.description,
+        authors: definition.authors,
+        license: definition.license,
+        categories: definition.categories,
+        tags: definition.tags,
+        compatibility: definition.compatibility,
+        visibility: definition.visibility,
+        dependencies: definition.dependencies,
+        ...(definition.render === undefined
+          ? {}
+          : { render: definition.render }),
+        cover,
+        artifact,
+      });
+      console.log(
+        `[${collection.name === null ? "" : `${collection.name}/`}${index + 1}/${manifests.length}] Built ${definition.id}@${definition.version}`,
+      );
+    }
+    resources.sort((left, right) =>
+      left.id < right.id ? -1 : left.id > right.id ? 1 : 0
     );
-  }
-  resources.sort((left, right) =>
-    left.id < right.id ? -1 : left.id > right.id ? 1 : 0
-  );
 
-  const catalog = ResourceCatalogV3Schema.parse({
-    schemaVersion: 3,
-    repository: loaded.site.repository,
-    revision: sha256(
-      stableJson({
-        schemaVersion: 3,
-        repository: loaded.site.repository,
-        resources,
-      }),
-    ),
-    resources,
-  });
-  const catalogPath = resolve(outputRoot, "catalog.json");
-  await writeFile(
-    catalogPath,
-    `${JSON.stringify(catalog, null, 2)}\n`,
-  );
+    const catalog = ResourceCatalogV3Schema.parse({
+      schemaVersion: 3,
+      repository: loaded.site.repository,
+      revision: sha256(
+        stableJson({
+          schemaVersion: 3,
+          repository: loaded.site.repository,
+          resources,
+        }),
+      ),
+      resources,
+    });
+    const catalogPath = resolve(collectionOutputRoot, "catalog.json");
+    await writeFile(
+      catalogPath,
+      `${JSON.stringify(catalog, null, 2)}\n`,
+    );
+    console.log(
+      `[${collection.name === null ? "<root>" : collection.name}] Generated catalog ${catalog.revision.slice(0, 12)} with ${resources.length} resources in ${collectionOutputRoot}`,
+    );
+    built.push({
+      name: collection.name,
+      catalogPath,
+      catalogRevision: catalog.revision,
+    });
+  }
   await rm(temporaryRoot, { recursive: true, force: true });
-  console.log(
-    `Generated catalog ${catalog.revision.slice(0, 12)} with ${resources.length} resources in ${outputRoot}`,
-  );
-  return { catalogPath, catalogRevision: catalog.revision };
+
+  const primary =
+    built.find((collection) => collection.name === "defaults") ?? built[0]!;
+  return {
+    catalogPath: primary.catalogPath,
+    catalogRevision: primary.catalogRevision,
+    collections: built,
+  };
 }
 
 export async function buildWallpaperEngineBundle(
@@ -786,7 +881,8 @@ export async function buildWallpaperEngineBundle(
   await rm(wallpaperEngineAssetsRoot, { recursive: true, force: true });
   await mkdir(outputRoot, { recursive: true });
 
-  const manifests = await loadManifests(loaded);
+  const collection = defaultCollection(await loadCollections(loaded));
+  const manifests = await loadManifests(loaded, collection);
   const resources: WallpaperEngineBundle["resources"] = {
     audios: [],
     models: [],
@@ -1151,58 +1247,107 @@ export async function publishR2(
     options?.bucket,
     process.env["R2_BUCKET_NAME"],
   );
-  const prefix = normalizeR2Prefix(options?.prefix);
   const outputRoot = resolveOutputRoot(loaded, outputDir);
-  const { catalogPath } = await buildRepository(loaded, outputRoot);
+  const { collections } = await buildRepository(loaded, outputRoot);
   const statePath = publishStateFilePath(loaded.siteDir);
   const state = await loadPublishState(statePath);
   const bucketState = (state[bucketName] ??= {});
   const isUpToDate = (key: string, sha: string): boolean =>
     !options?.force && bucketState[key] === sha;
 
-  const files = await listFiles(resolve(outputRoot, "objects"));
-  let uploaded = 0;
-  let skipped = 0;
-  for (const [index, file] of files.entries()) {
-    const key = r2ObjectKey(prefix, normalizeRelativePath(outputRoot, file));
-    const sha = await sha256File(file);
-    if (isUpToDate(key, sha)) {
-      console.log(`[${index + 1}/${files.length}] Skipping ${key} (unchanged)`);
-      skipped++;
-      continue;
+  const targets: { name: string | null; prefix: string; root: string }[] = [];
+  if (options?.prefix !== undefined) {
+    const prefix = normalizeR2Prefix(options.prefix);
+    if (collections.length === 1 && collections[0]!.name === null) {
+      targets.push({ name: null, prefix, root: outputRoot });
+    } else {
+      const match = collections.find(
+        (collection) => collection.name === prefix,
+      );
+      if (match === undefined) {
+        throw new Error(
+          `No collection named "${prefix}". Available collections: ${collections.map((collection) => collection.name ?? "<root>").join(", ")}`,
+        );
+      }
+      targets.push({
+        name: match.name,
+        prefix,
+        root: resolve(outputRoot, match.name!),
+      });
     }
-    console.log(`[${index + 1}/${files.length}] Uploading ${key}`);
-    await publishFile(
-      bucketName,
-      key,
-      file,
-      IMMUTABLE_CACHE_CONTROL,
-      loaded.siteDir,
-    );
-    bucketState[key] = sha;
-    await savePublishState(statePath, state);
-    uploaded++;
-  }
-  const catalogKey = r2ObjectKey(prefix, "catalog.json");
-  const catalogSha = await sha256File(catalogPath);
-  if (isUpToDate(catalogKey, catalogSha)) {
-    console.log(`Skipping ${catalogKey} (unchanged)`);
-    skipped++;
   } else {
-    console.log(`Uploading ${catalogKey} last`);
-    await publishFile(
-      bucketName,
-      catalogKey,
-      catalogPath,
-      CATALOG_CACHE_CONTROL,
-      loaded.siteDir,
-    );
-    bucketState[catalogKey] = catalogSha;
-    await savePublishState(statePath, state);
+    for (const collection of collections) {
+      targets.push({
+        name: collection.name,
+        prefix: normalizeR2Prefix(collection.name ?? ""),
+        root:
+          collection.name === null
+            ? outputRoot
+            : resolve(outputRoot, collection.name),
+      });
+    }
   }
-  console.log(
-    `Published catalog from ${outputRoot} (${uploaded} uploaded, ${skipped} skipped)`,
-  );
+
+  for (const target of targets) {
+    let files: string[] = [];
+    const objectsRoot = resolve(target.root, "objects");
+    try {
+      const objectsStats = await stat(objectsRoot);
+      if (objectsStats.isDirectory()) {
+        files = await listFiles(objectsRoot);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+    let uploaded = 0;
+    let skipped = 0;
+    for (const [index, file] of files.entries()) {
+      const key = r2ObjectKey(
+        target.prefix,
+        normalizeRelativePath(target.root, file),
+      );
+      const sha = await sha256File(file);
+      if (isUpToDate(key, sha)) {
+        console.log(`[${index + 1}/${files.length}] Skipping ${key} (unchanged)`);
+        skipped++;
+        continue;
+      }
+      console.log(`[${index + 1}/${files.length}] Uploading ${key}`);
+      await publishFile(
+        bucketName,
+        key,
+        file,
+        IMMUTABLE_CACHE_CONTROL,
+        loaded.siteDir,
+      );
+      bucketState[key] = sha;
+      await savePublishState(statePath, state);
+      uploaded++;
+    }
+    const catalogKey = r2ObjectKey(target.prefix, "catalog.json");
+    const catalogPath = resolve(target.root, "catalog.json");
+    const catalogSha = await sha256File(catalogPath);
+    if (isUpToDate(catalogKey, catalogSha)) {
+      console.log(`Skipping ${catalogKey} (unchanged)`);
+      skipped++;
+    } else {
+      console.log(`Uploading ${catalogKey} last`);
+      await publishFile(
+        bucketName,
+        catalogKey,
+        catalogPath,
+        CATALOG_CACHE_CONTROL,
+        loaded.siteDir,
+      );
+      bucketState[catalogKey] = catalogSha;
+      await savePublishState(statePath, state);
+    }
+    console.log(
+      `Published ${target.name === null ? "<root>" : target.name} catalog from ${target.root} (${uploaded} uploaded, ${skipped} skipped)`,
+    );
+  }
 }
 
 export const PUBLISH_STATE_FILE_NAME = ".resource-publish-state.json";

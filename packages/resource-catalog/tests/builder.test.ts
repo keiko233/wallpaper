@@ -3,6 +3,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises";
@@ -16,6 +17,7 @@ import {
 import {
   buildRepository,
   buildWallpaperEngineBundle,
+  loadCollections,
   loadManifests,
   loadPublishState,
   publishStateFilePath,
@@ -676,6 +678,142 @@ describe("resource catalog builder", () => {
         ),
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it("detects collection layouts and builds one catalog per collection", async () => {
+    const loaded = await makeSite();
+    const defaultsDirectory = resolve(loaded.manifestDir, "defaults");
+    const privateDirectory = resolve(loaded.manifestDir, "private");
+    await mkdir(defaultsDirectory, { recursive: true });
+    await mkdir(privateDirectory, { recursive: true });
+
+    const collectionOf: Record<string, string> = {
+      "example-audio": "defaults",
+      "example-camera": "defaults",
+      "example-motion": "defaults",
+      "example-model": "private",
+      "example-skybox": "private",
+      "example-stage": "private",
+    };
+    for (const [id, collection] of Object.entries(collectionOf)) {
+      await rename(
+        resolve(loaded.manifestDir, id),
+        resolve(loaded.manifestDir, collection, id),
+      );
+    }
+
+    const collections = await loadCollections(loaded);
+    expect(collections.map((collection) => collection.name)).toEqual([
+      "defaults",
+      "private",
+    ]);
+
+    const defaultsManifests = await loadManifests(loaded, collections[0]);
+    expect(
+      defaultsManifests.map(({ definition }) => definition.id),
+    ).toEqual(["example-audio", "example-camera", "example-motion"]);
+
+    const built = await buildRepository(
+      loaded,
+      loaded.site.outputDirectory,
+    );
+    expect(built.collections.map((result) => result.name)).toEqual([
+      "defaults",
+      "private",
+    ]);
+
+    const defaultsCatalog = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/defaults/catalog.json",
+        ),
+        "utf8",
+      ),
+    ) as { resources: Array<{ id: string }> };
+    expect(defaultsCatalog.resources.map((resource) => resource.id)).toEqual([
+      "example-audio",
+      "example-camera",
+      "example-motion",
+    ]);
+
+    const privateCatalog = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/private/catalog.json",
+        ),
+        "utf8",
+      ),
+    ) as { resources: Array<{ id: string }> };
+    expect(privateCatalog.resources.map((resource) => resource.id)).toEqual([
+      "example-model",
+      "example-skybox",
+      "example-stage",
+    ]);
+
+    await expect(
+      access(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/defaults/objects/audio/example-audio/1.0.0",
+        ),
+      ),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/private/objects/model/example-model/1.0.0",
+        ),
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("bundles Wallpaper Engine resources from the defaults collection", async () => {
+    const loaded = await makeSite();
+    const defaultsDirectory = resolve(loaded.manifestDir, "defaults");
+    const privateDirectory = resolve(loaded.manifestDir, "private");
+    await mkdir(defaultsDirectory, { recursive: true });
+    await mkdir(privateDirectory, { recursive: true });
+
+    const collectionOf: Record<string, string> = {
+      "example-audio": "defaults",
+      "example-camera": "defaults",
+      "example-motion": "defaults",
+      "example-model": "private",
+      "example-skybox": "private",
+      "example-stage": "private",
+    };
+    for (const [id, collection] of Object.entries(collectionOf)) {
+      await rename(
+        resolve(loaded.manifestDir, id),
+        resolve(loaded.manifestDir, collection, id),
+      );
+    }
+
+    await buildWallpaperEngineBundle(
+      loaded,
+      loaded.site.outputDirectory,
+    );
+    const bundle = JSON.parse(
+      await readFile(
+        resolve(
+          loaded.siteDir,
+          "dist/resource-publish/wallpaper-engine.json",
+        ),
+        "utf8",
+      ),
+    ) as {
+      resources: {
+        audios: Array<{ audioPath: string }>;
+        models: Array<{ id: string }>;
+      };
+    };
+    expect(bundle.resources.audios.map((audio) => audio.audioPath)).toEqual([
+      "/resources/audios/example-audio/example.wav",
+    ]);
+    expect(bundle.resources.models).toEqual([]);
   });
 
   it("carries stage render profiles into the catalog and Wallpaper Engine bundle", async () => {

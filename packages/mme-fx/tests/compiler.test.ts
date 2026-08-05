@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   compileMmeEffect,
@@ -7,8 +7,29 @@ import {
 } from "../src";
 import { parseArgs } from "../src/cli";
 
+const manifestsRoot = new URL(
+  "../../../resource-manifests/private/",
+  import.meta.url,
+);
+
+async function bundledManifestsAvailable(): Promise<boolean> {
+  try {
+    await access(
+      new URL(
+        "city-party/files/WorkingFloor2_by針金P/WorkingFloor2.fx",
+        manifestsRoot,
+      ),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const hasBundledManifests = await bundledManifestsAvailable();
+
 const workingFloorRoot = new URL(
-  "../../../resource-manifests/city-party/files/WorkingFloor2_by針金P/",
+  "../../../resource-manifests/private/city-party/files/WorkingFloor2_by針金P/",
   import.meta.url,
 );
 
@@ -109,37 +130,44 @@ describe("MME effect compiler", () => {
     });
   });
 
-  it("recognizes the bundled WorkingFloor2 effect structurally", async () => {
-    const source = await readFile(
-      new URL("WorkingFloor2.fx", workingFloorRoot),
-      "latin1",
-    );
+  it(
+    "recognizes the bundled WorkingFloor2 effect structurally",
+    { skip: !hasBundledManifests },
+    async () => {
+      const source = await readFile(
+        new URL("WorkingFloor2.fx", workingFloorRoot),
+        "latin1",
+      );
 
-    const result = compileMmeEffect(source, {
-      sourceName: "WorkingFloor2.fx",
-    });
+      const result = compileMmeEffect(source, {
+        sourceName: "WorkingFloor2.fx",
+      });
 
-    expect(result.ok).toBe(true);
-    expect(result.classification).toMatchObject({
-      present: true,
-      routesPmd: true,
-      routesPmx: true,
-      subEffectPmx: "WF_Object.fxsub",
-    });
-    expect(result.ir.offscreenRenderTargets[0]).toMatchObject({
-      name: "WorkingFloorRT",
-      viewportRatio: [1, 1],
-      clearDepth: 1,
-      antiAlias: true,
-    });
-    expect(result.ir.techniques.map((technique) => technique.name)).toEqual(
-      expect.arrayContaining(["MainTec", "ShadowTec", "ZplotTec"]),
-    );
-  });
+      expect(result.ok).toBe(true);
+      expect(result.classification).toMatchObject({
+        present: true,
+        routesPmd: true,
+        routesPmx: true,
+        subEffectPmx: "WF_Object.fxsub",
+      });
+      expect(result.ir.offscreenRenderTargets[0]).toMatchObject({
+        name: "WorkingFloorRT",
+        viewportRatio: [1, 1],
+        clearDepth: 1,
+        antiAlias: true,
+      });
+      expect(result.ir.techniques.map((technique) => technique.name)).toEqual(
+        expect.arrayContaining(["MainTec", "ShadowTec", "ZplotTec"]),
+      );
+    },
+  );
 
-  it("recognizes every bundled WorkingFloor host variant", async () => {
+  it(
+    "recognizes every bundled WorkingFloor host variant",
+    { skip: !hasBundledManifests },
+    async () => {
     const root = new URL(
-      "../../../resource-manifests/confectionery-section/files/WorkingFloor2_sm13316343/",
+      "../../../resource-manifests/private/confectionery-section/files/WorkingFloor2_sm13316343/",
       import.meta.url,
     );
     const paths = [
@@ -157,10 +185,13 @@ describe("MME effect compiler", () => {
     }
   });
 
-  it("recognizes AlternativeFull wrappers and their native material inputs", async () => {
+  it(
+    "recognizes AlternativeFull wrappers and their native material inputs",
+    { skip: !hasBundledManifests },
+    async () => {
     const source = await readFile(
       new URL(
-        "../../../resource-manifests/yyb-hatsune-miku-default/files/fx/clothes.fx",
+        "../../../resource-manifests/private/yyb-hatsune-miku-default/files/fx/clothes.fx",
         import.meta.url,
       ),
       "latin1",
@@ -180,9 +211,12 @@ describe("MME effect compiler", () => {
     expect(result.ir.includes).toEqual(["AlternativeFull.fxsub"]);
   });
 
-  it("classifies every bundled post-process family structurally", async () => {
+  it(
+    "classifies every bundled post-process family structurally",
+    { skip: !hasBundledManifests },
+    async () => {
     const root = new URL(
-      "../../../resource-manifests/confectionery-section/files/o_full-AlphaTest_im2004305/",
+      "../../../resource-manifests/private/confectionery-section/files/o_full-AlphaTest_im2004305/",
       import.meta.url,
     );
     const fixtures = [
@@ -206,10 +240,13 @@ describe("MME effect compiler", () => {
     }
   });
 
-  it("maps the bundled full alpha-test material effect to a native cutoff", async () => {
+  it(
+    "maps the bundled full alpha-test material effect to a native cutoff",
+    { skip: !hasBundledManifests },
+    async () => {
     const source = await readFile(
       new URL(
-        "../../../resource-manifests/confectionery-section/files/o_full-AlphaTest_im2004305/o_full-AlphaTest.fx",
+        "../../../resource-manifests/private/confectionery-section/files/o_full-AlphaTest_im2004305/o_full-AlphaTest.fx",
         import.meta.url,
       ),
       "latin1",
@@ -247,7 +284,10 @@ describe("EMD material effect maps", () => {
     });
   });
 
-  it("parses every bundled YYB EMD assignment", async () => {
+  it(
+    "parses every bundled YYB EMD assignment",
+    { skip: !hasBundledManifests },
+    async () => {
     const paths = [
       "yyb-hatsune-miku-10th/files/YYB Hatsune Miku_10th_v1.02.emd",
       "yyb-hatsune-miku-10th/files/YYB Hatsune Miku_10th_v1.02_toonchange.emd",
@@ -256,7 +296,7 @@ describe("EMD material effect maps", () => {
     ];
     for (const path of paths) {
       const source = await readFile(
-        new URL(`../../../resource-manifests/${path}`, import.meta.url),
+        new URL(`../../../resource-manifests/private/${path}`, import.meta.url),
         "utf8",
       );
       const result = parseEmdEffectMap(source);
@@ -332,7 +372,10 @@ describe("DirectX text mesh compiler", () => {
     });
   });
 
-  it("converts the bundled WorkingFloor2 accessory mesh", async () => {
+  it(
+    "converts the bundled WorkingFloor2 accessory mesh",
+    { skip: !hasBundledManifests },
+    async () => {
     const source = await readFile(
       new URL("WorkingFloor2.x", workingFloorRoot),
       "utf8",

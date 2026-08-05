@@ -176,6 +176,7 @@ export function localResourceSource(
     async configureServer(server) {
       let loadedSite: LoadedSite | undefined;
       let outputRoot: string | undefined;
+      let servedRoot: string | undefined;
       const watchers: ReturnType<typeof watch>[] = [];
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
       let currentBuild: Promise<void> | null = null;
@@ -185,26 +186,60 @@ export function localResourceSource(
       let pendingSiteReload = false;
       let scheduledSiteReload = false;
 
+      async function detectServedRoot(): Promise<string | undefined> {
+        if (outputRoot === undefined) return undefined;
+        const rootCatalogPath = resolve(outputRoot, "catalog.json");
+        const rootCatalogStats = await stat(rootCatalogPath).catch(
+          () => null,
+        );
+        if (rootCatalogStats !== null && rootCatalogStats.isFile()) {
+          return outputRoot;
+        }
+        const entries = await readdir(outputRoot, {
+          withFileTypes: true,
+        }).catch(() => []);
+        const collectionEntries = entries.filter(
+          (entry) => entry.isDirectory() && !entry.name.startsWith("."),
+        );
+        collectionEntries.sort((left, right) => {
+          if (left.name === "defaults") return -1;
+          if (right.name === "defaults") return 1;
+          return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+        });
+        for (const entry of collectionEntries) {
+          const stats = await stat(
+            resolve(outputRoot, entry.name, "catalog.json"),
+          ).catch(() => null);
+          if (stats !== null && stats.isFile()) {
+            return resolve(outputRoot, entry.name);
+          }
+        }
+        return outputRoot;
+      }
+
       async function refreshSite(): Promise<void> {
         loadedSite = await loadSite(siteConfigPath);
         outputRoot = resolve(
           loadedSite.siteDir,
           loadedSite.site.outputDirectory,
         );
+        servedRoot = await detectServedRoot();
       }
 
       async function catalogExists(): Promise<boolean> {
-        if (outputRoot === undefined) return false;
-        const catalogPath = resolve(outputRoot, "catalog.json");
+        const root = servedRoot ?? outputRoot;
+        if (root === undefined) return false;
+        const catalogPath = resolve(root, "catalog.json");
         const catalogStats = await stat(catalogPath).catch(() => null);
         return catalogStats !== null && catalogStats.isFile();
       }
 
       async function isOutputStale(): Promise<boolean> {
-        if (loadedSite === undefined || outputRoot === undefined) {
+        const root = servedRoot ?? outputRoot;
+        if (loadedSite === undefined || root === undefined) {
           return true;
         }
-        const catalogPath = resolve(outputRoot, "catalog.json");
+        const catalogPath = resolve(root, "catalog.json");
         const catalogStats = await stat(catalogPath).catch(() => null);
         if (catalogStats === null) return true;
 
@@ -275,6 +310,7 @@ export function localResourceSource(
 
           try {
             await rename(stagingDirectory, outputRoot);
+            servedRoot = await detectServedRoot();
           } catch (activationError) {
             // Activation failed. Restore the previous output if we have one.
             if (backupCreated) {
@@ -430,10 +466,11 @@ export function localResourceSource(
         next: (error?: unknown) => void,
         relativePath: string,
       ): void {
-        if (outputRoot === undefined) {
+        const root = servedRoot ?? outputRoot;
+        if (root === undefined) {
           return next();
         }
-        const resolvedRoot = resolve(outputRoot);
+        const resolvedRoot = resolve(root);
         const file = resolve(resolvedRoot, relativePath);
         if (
           file !== resolvedRoot &&

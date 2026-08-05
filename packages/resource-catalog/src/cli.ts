@@ -19,8 +19,13 @@ export interface ParsedArgs {
   force: boolean;
 }
 
-const USAGE =
-  "Usage: wallpaper-resource-catalog <validate|build|publish-r2|bundle-wallpaper-engine> [--config <path>] [--output <dir>]\n       publish-r2 options: [--bucket <name>] [--prefix <path>] [--force]";
+const USAGE = [
+  "Usage: wallpaper-resource-catalog <validate|build|publish-r2|bundle-wallpaper-engine> [--config <path>] [--output <dir>]",
+  "       publish-r2 options: [--bucket <name>] [--prefix <path>] [--force]",
+  "       When the manifest root contains collection directories (e.g. defaults, private),",
+  "       build produces one catalog per collection and publish-r2 uploads each under its",
+  "       own prefix automatically. Omit --prefix to publish all collections.",
+].join("\n");
 
 function optionValue(argv: string[], index: number, option: string): string {
   const value = argv[index + 1];

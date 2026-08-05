@@ -149,6 +149,20 @@ describe("localResourceSource configureServer", () => {
     await mkdir(resolve(root, "manifests", "bad-resource"), {
       recursive: true,
     });
+    await writeFile(
+      resolve(root, "manifests", "bad-resource", "manifest.json"),
+      JSON.stringify({
+        id: "bad-resource",
+        version: "1.0.0",
+        kind: "model",
+        name: "Bad resource",
+        artifact: {
+          fileName: "bad-resource.zip",
+          format: "zip",
+          entrypoints: { model: "model.pmx" },
+        },
+      }),
+    );
 
     const plugin = localResourceSource({ siteConfigPath });
     const fakeServer = createFakeServer();
