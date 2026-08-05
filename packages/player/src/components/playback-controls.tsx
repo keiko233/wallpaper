@@ -152,8 +152,12 @@ export function PlaybackControls() {
         <Motion.div
           animate={{
             borderRadius: expanded ? 16 : 999,
-            height: expanded ? 52 : 6,
-            width: expanded ? "auto" : 80,
+            // rem-based so the capsule scales with --ui-root-font-size
+            // (the Wallpaper Engineer UI scale); fixed px values would
+            // clip the rem-sized buttons and p-1.5 padding on large
+            // monitors.
+            height: expanded ? "3.25rem" : "0.375rem",
+            width: expanded ? "auto" : "5rem",
           }}
           className="relative flex max-w-full shrink-0 items-center justify-center overflow-hidden"
           initial={false}

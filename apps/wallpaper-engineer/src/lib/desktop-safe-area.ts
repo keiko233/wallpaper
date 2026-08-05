@@ -30,6 +30,14 @@ const EMPTY_SAFE_AREA: DesktopSafeArea = {
   left: 0,
 };
 
+/**
+ * Fullscreen detection tolerance. The CEF viewport of a Wallpaper Engine
+ * wallpaper is never smaller than the monitor it covers, and a regular
+ * maximized window always ends short of it on the taskbar axis, so a 2%
+ * slack keeps this from misfiring on either side.
+ */
+const FULLSCREEN_TOLERANCE = 0.02;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -46,23 +54,42 @@ export function getDesktopSafeArea({
   availLeft,
   availTop,
 }: DesktopGeometry): DesktopSafeArea {
-  // Normal browser windows already end above the taskbar. Only reserve the
-  // work-area difference when the content covers the complete monitor, as a
-  // Wallpaper Engine web wallpaper does.
-  const coversFullScreen = viewportWidth >= screenWidth - 1 &&
-    viewportHeight >= screenHeight - 1;
+  // Wallpaper Engine can force its CEF viewport to DPR 1 while the OS still
+  // reports the monitor in device-independent pixels, leaving the CSS
+  // viewport a constant factor larger than screen.width/height. Raw size
+  // comparisons are therefore meaningless here; instead, compare the
+  // per-axis scale factors, which stay equal for any fullscreen window.
+  const scaleX = viewportWidth / screenWidth;
+  const scaleY = viewportHeight / screenHeight;
+  const coversFullScreen =
+    scaleX >= 1 - FULLSCREEN_TOLERANCE &&
+    scaleY >= 1 - FULLSCREEN_TOLERANCE;
   if (!coversFullScreen) {
     return EMPTY_SAFE_AREA;
   }
 
-  const left = clamp(availLeft - screenX, 0, viewportWidth);
-  const top = clamp(availTop - screenY, 0, viewportHeight);
+  // The work area excludes the taskbar and similar docks. Reserve an inset
+  // on every edge where the monitor extends past the work area, converted
+  // from screen units into viewport units via the per-axis scale so the
+  // control bar and lyrics never end up underneath the taskbar.
+  const left = clamp((availLeft - screenX) * scaleX, 0, viewportWidth);
+  const top = clamp((availTop - screenY) * scaleY, 0, viewportHeight);
+  const right = clamp(
+    (screenX + screenWidth - (availLeft + availWidth)) * scaleX,
+    0,
+    viewportWidth,
+  );
+  const bottom = clamp(
+    (screenY + screenHeight - (availTop + availHeight)) * scaleY,
+    0,
+    viewportHeight,
+  );
 
   return {
     top,
+    right,
+    bottom,
     left,
-    right: clamp(screenWidth - left - availWidth, 0, viewportWidth),
-    bottom: clamp(screenHeight - top - availHeight, 0, viewportHeight),
   };
 }
 
