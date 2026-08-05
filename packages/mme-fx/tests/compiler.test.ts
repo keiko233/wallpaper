@@ -8,7 +8,7 @@ import {
 import { parseArgs } from "../src/cli";
 
 const manifestsRoot = new URL(
-  "../../../resource-manifests/private/",
+  "../../../resource-manifests/defaults/",
   import.meta.url,
 );
 
@@ -29,7 +29,7 @@ async function bundledManifestsAvailable(): Promise<boolean> {
 const hasBundledManifests = await bundledManifestsAvailable();
 
 const workingFloorRoot = new URL(
-  "../../../resource-manifests/private/city-party/files/WorkingFloor2_by針金P/",
+  "../../../resource-manifests/defaults/city-party/files/WorkingFloor2_by針金P/",
   import.meta.url,
 );
 
@@ -167,7 +167,7 @@ describe("MME effect compiler", () => {
     { skip: !hasBundledManifests },
     async () => {
     const root = new URL(
-      "../../../resource-manifests/private/confectionery-section/files/WorkingFloor2_sm13316343/",
+      "../../../resource-manifests/defaults/confectionery-section/files/WorkingFloor2_sm13316343/",
       import.meta.url,
     );
     const paths = [
@@ -216,7 +216,7 @@ describe("MME effect compiler", () => {
     { skip: !hasBundledManifests },
     async () => {
     const root = new URL(
-      "../../../resource-manifests/private/confectionery-section/files/o_full-AlphaTest_im2004305/",
+      "../../../resource-manifests/defaults/confectionery-section/files/o_full-AlphaTest_im2004305/",
       import.meta.url,
     );
     const fixtures = [
@@ -246,7 +246,7 @@ describe("MME effect compiler", () => {
     async () => {
     const source = await readFile(
       new URL(
-        "../../../resource-manifests/private/confectionery-section/files/o_full-AlphaTest_im2004305/o_full-AlphaTest.fx",
+        "../../../resource-manifests/defaults/confectionery-section/files/o_full-AlphaTest_im2004305/o_full-AlphaTest.fx",
         import.meta.url,
       ),
       "latin1",
