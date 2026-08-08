@@ -7,7 +7,7 @@ allowBuilds:
   workerd: true
 
 overrides:
-  '@esbuild-kit/core-utils>esbuild': ^0.25.12
+  '@esbuild-kit/core-utils>esbuild': ^0.28.0
 
 patchedDependencies:
   ammo.js@0.0.2: patches/ammo.js@0.0.2.patch
