@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@esbuild-kit/core-utils>esbuild': ^0.25.12
+  '@esbuild-kit/core-utils>esbuild': ^0.28.0
 
 patchedDependencies:
   ammo.js@0.0.2: 3e760b51992473e8b1d26ec401857066ec0c1c4c94c101a6b60e318340278b71
